@@ -125,8 +125,8 @@ function questPage(data) {
             ${from ? `<div><dt>Стоимость</dt><dd>от ${esc(s.money(from.priceFrom))}</dd></div>` : ''}
           </dl>
           <div class="hero-actions">
-            <a class="btn btn-blood btn-xl" href="/booking">Забронировать</a>
-            <a class="btn btn-outline btn-xl" href="${esc(settings.whatsappUrl)}" rel="noopener">Спросить в WhatsApp</a>
+            <a class="link-lead" href="/booking">Выбрать время</a>
+            <a class="link-quiet" href="${esc(settings.whatsappUrl)}" rel="noopener">Спросить в WhatsApp</a>
           </div>
         </div>
         <figure class="quest-hero-photo">

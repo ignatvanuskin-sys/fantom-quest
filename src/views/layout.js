@@ -48,13 +48,9 @@ function header(settings, path) {
       <span class="sr-only">Меню</span>
     </button>
     <nav class="site-nav" id="site-nav" aria-label="Основная навигация">${nav}</nav>
-    <div class="header-actions">
-      <a class="header-phone" href="tel:${esc(settings.phoneE164)}">
-        <span class="header-phone-label">Телефон</span>
-        <span class="header-phone-value">${esc(settings.phone)}</span>
-      </a>
-      <a class="btn btn-blood" href="/booking" data-fx-magnetic>Забронировать</a>
-    </div>
+    <a class="header-phone" href="tel:${esc(settings.phoneE164)}" aria-label="Позвонить: ${esc(settings.phone)}">
+      <span class="header-phone-value">${esc(settings.phone)}</span>
+    </a>
   </div>
 </header>`;
 }
@@ -72,66 +68,31 @@ function footer(settings, location) {
     <div class="footer-brand-col">
       <p class="footer-brand">${esc(settings.brand.displayName)}</p>
       <p class="footer-tagline">${esc(settings.brand.tagline)}</p>
-      <p class="footer-note">${esc(settings.brand.legalName)}</p>
       <p class="footer-note">${esc(location.fullAddress)}</p>
       <p class="footer-note">${esc(settings.hours.label)}</p>
     </div>
     <div>
-      <p class="footer-title">Запись</p>
-      <p><a href="/booking">Выбрать время</a></p>
-      <p><a href="/prices">Пакеты и цены</a></p>
-      <p><a href="tel:${esc(settings.phoneE164)}">${esc(settings.phone)}</a></p>
-      <p><a href="${esc(settings.whatsappUrl)}" rel="noopener">WhatsApp</a></p>
-    </div>
-    <div>
-      <p class="footer-title">О квесте</p>
-      <p><a href="/quests">Сценарий и режимы</a></p>
+      <p class="footer-title">Страницы</p>
+      <p><a href="/quests">Квест</a></p>
+      <p><a href="/prices">Цены</a></p>
       <p><a href="/gallery">Галерея</a></p>
       <p><a href="/reviews">Отзывы</a></p>
-      <p><a href="/faq">Частые вопросы</a></p>
+      <p><a href="/faq">Вопросы</a></p>
     </div>
     <div>
       <p class="footer-title">Связь</p>
+      <p><a href="/booking">Записаться</a></p>
+      <p><a href="tel:${esc(settings.phoneE164)}">${esc(settings.phone)}</a></p>
+      <p><a href="${esc(settings.whatsappUrl)}" rel="noopener">WhatsApp</a></p>
       <p><a href="${esc(settings.instagramUrl)}" rel="noopener">${esc(settings.instagramHandle)}</a></p>
-      <p><a href="${esc(location.galleryUrl)}" rel="noopener">Фото в 2ГИС</a></p>
-      <p><a href="${esc(location.routeUrl)}" rel="noopener">Маршрут в 2ГИС</a></p>
-      <p><a href="/privacy">Обработка данных</a></p>
+      <p><a href="${esc(location.routeUrl)}" rel="noopener">Маршрут</a></p>
     </div>
   </div>
   <div class="wrap footer-bottom">
-    <span>
-      Рейтинг и отзывы — динамические данные 2ГИС, обновлено ${esc(settings.rating.updatedAt)}.
-      Непроверенные сведения помечены на сайте как «уточняется».
-    </span>
+    <span>${esc(settings.brand.legalName)}</span>
+    <span>Данные 2ГИС обновлены ${esc(settings.rating.updatedAt)}. Непроверенное помечено «уточняется».</span>
   </div>
-</footer>
-${soundControl()}
-${contactBar(settings)}`;
-}
-
-/** Звук: выключен по умолчанию, включается только явным нажатием. */
-function soundControl() {
-  return `<button class="sound-control" type="button" data-sound-toggle aria-pressed="false" hidden>
-  <span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-  <span class="sound-label" data-sound-label>Звук выключен</span>
-</button>`;
-}
-
-/**
- * Компактная панель контактов на мобильном.
- * Не перекрывает контент: одна строка, учитывает safe-area, скрывается
- * при прокрутке вниз и при открытой клавиатуре (см. app.js).
- */
-function contactBar(settings) {
-  return `<div class="contact-bar" data-contact-bar>
-  <a class="contact-bar-btn contact-bar-btn--ghost" href="tel:${esc(settings.phoneE164)}">
-    <span aria-hidden="true">☏</span><span>Позвонить</span>
-  </a>
-  <a class="contact-bar-btn contact-bar-btn--wa" href="${esc(settings.whatsappUrl)}" rel="noopener">
-    <span aria-hidden="true">✆</span><span>WhatsApp</span>
-  </a>
-  <a class="contact-bar-btn contact-bar-btn--blood" href="/booking">Забронировать</a>
-</div>`;
+</footer>`;
 }
 
 /**

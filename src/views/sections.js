@@ -104,57 +104,37 @@ function hero({ settings, location, quest, packages }) {
   const r = settings.rating;
 
   return `<section class="hero" data-hero>
-  <div class="hero-media fx-corners fx-corners--lg" aria-hidden="true">
+  <div class="hero-media">
     <img src="/images/quests/nun-hood-900.webp" srcset="/images/quests/nun-hood-900.webp 900w, /images/quests/nun-hood-1440.webp 1440w" sizes="100vw" alt="" width="1440" height="2636" fetchpriority="high" decoding="async">
-    <canvas class="fx-ink" data-fx-ink width="240" height="240"></canvas>
-    <span class="hero-veil"></span>
-    <span class="hero-grain"></span>
-    <span class="fx-scanlines"></span>
-    <span class="fx-sweep"></span>
-    <span class="fx-osd">
-      <span class="fx-osd-rec"></span>
-      <span>Камера 02</span>
-      <span class="fx-osd-sep">·</span>
-      <span class="fx-osd-time" data-fx-clock>00:00:00</span>
-    </span>
   </div>
 
   <div class="wrap hero-inner">
-    <p class="hero-kicker">
-      <span class="pulse" aria-hidden="true"></span>
-      Хоррор-квесты · ${esc(settings.city)}
-    </p>
-
     <h1 class="hero-title">
-      <span class="hero-title-brand">${brandMark(52)} Fantom</span>
-      <span class="hero-title-line">Ты уверен, что хочешь войти?</span>
+      <span class="hero-title-brand">Fantom</span>
+      <span class="hero-title-line">${esc(quest.name)}</span>
     </h1>
 
     <p class="hero-lead">
-      Локация «${esc(quest.name)}»: <b>${esc(String(quest.durationMinutes))} минут</b> внутри сюжета,
+      Хоррор-квест в Усть-Каменогорске. ${esc(String(quest.durationMinutes))} минут,
       ${esc(String(quest.characters.length))} ${plural(quest.characters.length, 'персонаж', 'персонажа', 'персонажей')}
-      и ${esc(String(quest.modes.list.length))} ${plural(quest.modes.list.length, 'режим', 'режима', 'режимов')} страха.
-      Уровень выбираешь ты — от детского до харда 18+.
+      и ${esc(String(quest.modes.list.length))} ${plural(quest.modes.list.length, 'режим', 'режима', 'режимов')} страха на выбор.
     </p>
 
     <dl class="hero-facts">
-      <div><dt>Оценка игроков</dt><dd>${esc(String(r.value).replace('.', ','))} / 5 · ${esc(String(r.reviewsCount))} ${plural(r.reviewsCount, 'отзыв', 'отзыва', 'отзывов')}</dd></div>
+      <div><dt>Рейтинг</dt><dd>${esc(String(r.value).replace('.', ','))} / 5 · ${esc(String(r.reviewsCount))} ${plural(r.reviewsCount, 'отзыв', 'отзыва', 'отзывов')}</dd></div>
       <div><dt>Длительность</dt><dd>${esc(String(quest.durationMinutes))} ${plural(quest.durationMinutes, 'минута', 'минуты', 'минут')}</dd></div>
-      <div><dt>Режимы</dt><dd>${esc(String(quest.modes.list.length))} ${plural(quest.modes.list.length, 'уровень', 'уровня', 'уровней')} страха</dd></div>
-      ${from ? `<div><dt>Стоимость</dt><dd>от ${esc(money(from.priceFrom))}</dd></div>` : ''}
+      ${from ? `<div><dt>Цена</dt><dd>от ${esc(money(from.priceFrom))}</dd></div>` : ''}
     </dl>
 
-    <div class="hero-actions">
-      <a class="btn btn-blood btn-xl fx-beam" href="/booking" data-cta="hero" data-fx-magnetic>Забронировать</a>
-      <a class="btn btn-outline btn-xl" href="#quests" data-cta="catalog">Выбрать квест</a>
-    </div>
+    <p class="hero-actions">
+      <a class="link-lead" href="/booking" data-cta="hero">Выбрать время</a>
+      <a class="link-quiet" href="tel:${esc(settings.phoneE164)}" data-cta="phone">${esc(settings.phone)}</a>
+    </p>
 
     <p class="hero-note">
       ${esc(location.streetAddress)} · ${esc(settings.hours.label)} · оплата на месте
     </p>
   </div>
-
-  <a class="hero-scroll" href="#trust" aria-label="Листать вниз"><span aria-hidden="true"></span></a>
 </section>`;
 }
 
@@ -234,9 +214,9 @@ function slotsBoard({ days, quest, settings, limit = 6 }) {
   return `<section class="section section--slots" id="slots">
   <div class="wrap">
     ${sectionHead({
-      eyebrow: 'Занятость сейчас',
+      eyebrow: 'Занятость',
       title: 'Ближайшие игры',
-      lead: 'Свободное время по игровым дням. Ночные сеансы после полуночи помечены отдельно.'
+      lead: 'Свободное время по игровым дням. Сеансы после полуночи — отдельной строкой.'
     })}
 
     ${
@@ -253,15 +233,15 @@ function slotsBoard({ days, quest, settings, limit = 6 }) {
           <span>${esc(quest.name)}</span>
           <small>${esc(settings.hours.label)}</small>
         </div>
-        <a class="btn btn-blood" href="/booking?date=${esc(row.day.businessDate)}&time=${esc(row.slot.time)}">Забронировать</a>
+        <a class="link-lead" href="/booking?date=${esc(row.day.businessDate)}&time=${esc(row.slot.time)}">Выбрать</a>
       </li>`
         )
         .join('')}
     </ul>`
         : `<div class="empty-state">
         <b>Свободное время показывается в форме записи</b>
-        <p>Выберите сценарий и дату — свободные слоты появятся сразу.</p>
-        <a class="btn btn-blood" href="/booking">Перейти к записи</a>
+        <p>Выберите программу и дату — свободные слоты появятся сразу.</p>
+        <a class="link-lead" href="/booking">Перейти к записи</a>
       </div>`
     }
 
@@ -272,7 +252,7 @@ function slotsBoard({ days, quest, settings, limit = 6 }) {
         ? `<p class="section-note">
       Показаны ближайшие ${rows.length} ${plural(rows.length, 'слот', 'слота', 'слотов')}.
       Всего свободно ${esc(String(open.length))} ${plural(open.length, 'слот', 'слота', 'слотов')} —
-      полный список открывается в форме записи. Свободное время не зависит от выбранной программы.
+      полный список открывается в форме записи.
     </p>`
         : ''
     }
@@ -289,11 +269,9 @@ function catalog({ packages, settings, quest }) {
   return `<section class="section section--catalog" id="quests">
   <div class="wrap">
     ${sectionHead({
-      eyebrow: 'Каталог',
+      eyebrow: 'Программы',
       title: 'Выбери свой страх',
-      lead:
-        'Четыре программы: короткая с кинорумом, две полные с пиццей и бургерами и «Пакет Хоррор» с фильмом «Проклятия Монахини». ' +
-        'Цены — с прайс-листов локации.'
+      lead: 'Четыре программы: с кинорумом, с пиццей и бургерами и «Пакет Хоррор» с фильмом. Цены — с прайс-листов локации.'
     })}
 
     ${
@@ -328,7 +306,7 @@ function catalog({ packages, settings, quest }) {
 }
 
 function catalogCard(item) {
-  return `<article class="quest-card fx-beam" data-duration="${esc(item.durationLabel || '')}" id="${esc(item.id)}" data-fx="rise" data-fx-spot>
+  return `<article class="quest-card" data-duration="${esc(item.durationLabel || '')}" id="${esc(item.id)}" data-fx="rise" data-fx-spot>
   <a class="quest-card-media" href="#${esc(item.id)}" aria-label="${esc(item.name)}">
     ${
       item.priceListImage
@@ -373,10 +351,9 @@ function characters({ quest }) {
   return `<section class="section section--characters" id="characters">
   <div class="wrap">
     ${sectionHead({
-      eyebrow: 'Кто ждёт внутри',
-      title: 'Внутри ждут не декорации',
-      lead:
-        'Игру ведут живые актёры. В сценарии их трое — и каждый работает по выбранному вами уровню страха.'
+      eyebrow: 'Персонажи',
+      title: 'Кто ждёт внутри',
+      lead: 'Игру ведут актёры. В сценарии их трое, и каждый работает по выбранному вами уровню страха.'
     })}
 
     <div class="characters">
@@ -420,9 +397,7 @@ function fearScale({ quest }) {
     ${sectionHead({
       eyebrow: 'Уровень страха',
       title: 'Насколько жутко — решаете вы',
-      lead:
-        'У локации пять режимов: два детских, два средних и хард. Режим выбирается при записи, ' +
-        'и администратор подтверждает его с командой до игры.'
+      lead: 'Пять режимов: два детских, два средних и хард. Режим выбирается при записи.'
     })}
 
     <ol class="fear-list" data-fear>
@@ -441,8 +416,7 @@ function fearScale({ quest }) {
     </ol>
 
     <div class="fear-actions">
-      <a class="btn btn-blood btn-xl" href="/booking">Забронировать с нужным режимом</a>
-      <a class="btn btn-outline btn-xl" href="${esc(quest.modes.sourcePhoto)}" target="_blank" rel="noopener">Фото таблички режимов</a>
+      <a class="btn btn-outline" href="${esc(quest.modes.sourcePhoto)}" target="_blank" rel="noopener">Фото таблички режимов</a>
     </div>
 
     <p class="source-line">
@@ -503,8 +477,8 @@ function story({ content, quest }) {
     </div>
 
     <div class="story-actions">
-      <a class="btn btn-blood btn-xl" href="/booking">Забронировать квест</a>
-      <a class="btn btn-outline btn-xl" href="/quests">Все программы</a>
+      <a class="link-lead" href="/booking">Выбрать время</a>
+      <a class="link-quiet" href="/quests">Все программы</a>
     </div>
   </div>
 </section>`;
@@ -518,8 +492,7 @@ function features({ content }) {
     ${sectionHead({
       eyebrow: 'Что внутри',
       title: 'Ты не просто решаешь загадки',
-      lead:
-        'Это не комната с замками. Каждый пункт ниже подтверждён источниками: вывеской, прайс-листом или публикацией FANTOM.'
+      lead: 'Каждый пункт ниже подтверждён источниками: вывеской, прайс-листом или публикацией FANTOM.'
     })}
     <div class="features">
       ${content.features
@@ -546,8 +519,7 @@ function gallery({ gallery, settings, location, withViewer = true, limit = 0 }) 
     ${sectionHead({
       eyebrow: 'Изнутри',
       title: 'Кадры, снятые внутри',
-      lead:
-        'Фотографии локации, актёров и гостей из галереи FANTOM в 2ГИС. Нажмите на кадр — откроется на весь экран.'
+      lead: 'Фотографии локации, актёров и гостей из галереи FANTOM в 2ГИС. Нажмите на кадр — откроется на весь экран.'
     })}
   </div>
 
@@ -638,10 +610,9 @@ function numbers({ settings, quest, packages, location }) {
   return `<section class="section section--numbers" id="numbers">
   <div class="wrap">
     ${sectionHead({
-      eyebrow: 'Проверяемые цифры',
+      eyebrow: 'Цифры',
       title: 'Ни одной цифры «из головы»',
-      lead:
-        'Всё, что есть на этой странице, можно проверить по ссылкам ниже. Мы намеренно не показываем счётчики вроде «10 000 игроков» и не запускаем таймеры — страх должен быть в локации, а не в интерфейсе.'
+      lead: 'Всё, что есть на странице, можно проверить по ссылкам ниже. Счётчики вроде «10 000 игроков» мы не показываем.'
     })}
 
     <ul class="numbers">
@@ -772,7 +743,7 @@ function howItWorks({ content, quest, settings }) {
         .join('')}
     </ol>
     <div class="how-actions">
-      <a class="btn btn-blood btn-xl" href="/booking">Забронировать</a>
+      <a class="link-lead" href="/booking">Выбрать время</a>
     </div>
   </div>
 </section>`;
@@ -874,7 +845,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
         .join('')}
     </ol>
 
-    <fieldset class="fx-corners fx-corners--hot wizard-step is-active" data-step="1">
+    <fieldset class="wizard-step is-active" data-step="1">
       <legend class="wizard-legend">Шаг 1 из 5. Выберите программу</legend>
       <div class="package-picker" role="radiogroup" aria-label="Программа">
         ${bookable
@@ -901,7 +872,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       </div>
     </fieldset>
 
-    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="2">
+    <fieldset class="wizard-step" data-step="2">
       <legend class="wizard-legend">Шаг 2 из 5. Выберите дату</legend>
       <div class="date-strip" data-date-strip role="radiogroup" aria-label="Игровой день">
         ${days
@@ -925,7 +896,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       </div>
     </fieldset>
 
-    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="3">
+    <fieldset class="wizard-step" data-step="3">
       <legend class="wizard-legend">Шаг 3 из 5. Выберите время</legend>
       <p class="wizard-hint" data-slot-day></p>
       <div class="slot-picker" role="radiogroup" aria-label="Свободное время" data-slot-picker>
@@ -939,7 +910,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       </div>
     </fieldset>
 
-    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="4">
+    <fieldset class="wizard-step" data-step="4">
       <legend class="wizard-legend">Шаг 4 из 5. Гости и контакты</legend>
 
       <div class="field">
@@ -1008,7 +979,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       </div>
     </fieldset>
 
-    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="5">
+    <fieldset class="wizard-step" data-step="5">
       <legend class="wizard-legend">Шаг 5 из 5. Проверьте и подтвердите</legend>
       <dl class="confirm-list" data-confirm></dl>
       <p class="wizard-error" data-form-error role="alert" aria-live="assertive" hidden></p>
@@ -1023,7 +994,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
   </form>
 
   <aside class="wizard-summary" aria-live="polite">
-    <div class="summary-card fx-corners">
+    <div class="summary-card">
       <p class="summary-title">Ваша бронь</p>
       <ul class="summary-list">
         <li><span>Программа</span><b data-summary-package>—</b></li>
@@ -1144,7 +1115,7 @@ function faq({ faq: items, limit = 0, title = 'Отвечаем прямо', lea
     ${sectionHead({
       eyebrow: 'Вопросы',
       title,
-      lead: lead || 'Собрали то, что чаще всего спрашивают перед первой игрой. Ответы, которых у нас нет, мы не придумываем — их подтвердит владелец.'
+      lead: lead || 'Собрали то, что чаще всего спрашивают перед первой игрой. Чего мы не знаем — не выдумываем.'
     })}
     <div class="faq-list">${list.map((item, index) => faqItem(item, index)).join('')}</div>
   </div>
@@ -1165,8 +1136,8 @@ function finalCta({ settings, content, location }) {
     <h2 class="final-title">${esc(cta.title)}</h2>
     <p class="final-lead">${esc(cta.lead)}</p>
     <div class="final-actions">
-      <a class="btn btn-blood btn-xl fx-beam" href="/booking" data-cta="final" data-fx-magnetic>Забронировать квест</a>
-      <a class="btn btn-outline btn-xl" href="tel:${esc(settings.phoneE164)}" data-cta="phone">${esc(settings.phone)}</a>
+      <a class="btn btn-blood btn-xl" href="/booking" data-cta="final">Выбрать время</a>
+      <a class="link-quiet" href="tel:${esc(settings.phoneE164)}" data-cta="phone">${esc(settings.phone)}</a>
     </div>
     <p class="final-note">Заявка бесплатная. Администратор подтвердит время в WhatsApp — и всё.</p>
     <p class="final-address">${esc(location.fullAddress)} · ${esc(settings.hours.label)}</p>

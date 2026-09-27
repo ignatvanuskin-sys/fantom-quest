@@ -782,7 +782,10 @@ async function run() {
     for (const wrong of ['5 уровня страха', '5 режима страха', 'и ещё 1 пункта', '2 человек включено']) {
       assert.ok(!home.text.includes(wrong), `число не согласовано: «${wrong}»`);
     }
-    assert.ok(home.text.includes('уровней страха'), 'нужна форма «уровней страха»');
+    // На главной hero говорит «режимов страха», на странице квеста — «уровней страха».
+    assert.ok(home.text.includes('режимов страха'), 'нужна форма «режимов страха»');
+    const questPage = await get('/quests');
+    assert.ok(questPage.text.includes('уровней страха'), 'нужна форма «уровней страха»');
   });
 
   await test('Запись: число гостей по умолчанию берётся из программы', async () => {
@@ -913,14 +916,31 @@ async function run() {
     assert.ok(/min-height:\s*(4[4-9]|[5-9]\d)px/.test(css), 'нужны touch-target не меньше 44px');
   });
 
-  await test('Звук выключен по умолчанию и не стартует сам', async () => {
+  /*
+   * Звука на сайте больше нет, и на первом экране не должно быть стены кнопок:
+   * раньше шапка, две крупные кнопки в hero и фиксированная панель снизу
+   * закрывали весь кадр на телефоне. Проверяем, что этого не вернулось.
+   */
+  await test('Первый экран без звука и без стены кнопок', async () => {
     const page = await get('/');
-    const button = page.text.match(/<button class="sound-control"[^>]*>/);
-    assert.ok(button, 'нет кнопки звука');
-    assert.ok(button[0].includes('hidden'), 'кнопка звука скрыта до включения JS');
-    assert.ok(button[0].includes('aria-pressed="false"'), 'звук по умолчанию выключен');
+    assert.ok(!/sound-control|data-sound-toggle/.test(page.text), 'звука на сайте быть не должно');
+    assert.ok(!/contact-bar/.test(page.text), 'фиксированной панели контактов быть не должно');
+
+    const header = page.text.match(/<header[\s\S]*?<\/header>/);
+    assert.ok(header, 'нет шапки');
+    assert.ok(!/<button class="btn/.test(header[0]), 'в шапке не должно быть кнопок');
+
+    const hero = page.text.match(/<section class="hero"[\s\S]*?<\/section>/);
+    assert.ok(hero, 'нет первого экрана');
+    assert.strictEqual(
+      (hero[0].match(/class="btn/g) || []).length,
+      0,
+      'в hero кнопок быть не должно — только текстовые ссылки'
+    );
+    assert.ok(hero[0].includes('class="link-lead"'), 'в hero нужна ссылка на выбор времени');
+
     const js = await fsp.readFile(path.join(config.publicDir, 'app.js'), 'utf8');
-    assert.ok(!/addEventListener\('load'[\s\S]{0,200}build\(\)/.test(js), 'звук не должен запускаться сам');
+    assert.ok(!/AudioContext|initSound/.test(js), 'код звука должен быть удалён целиком');
   });
 
   await test('Аналитика не отправляет персональные данные', async () => {

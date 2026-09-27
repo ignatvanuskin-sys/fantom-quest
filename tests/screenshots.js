@@ -479,16 +479,6 @@ async function run() {
   const nav = JSON.parse(navAfter);
   await capture(client, 390, 1400, path.join(OUT, 'nav-open-mobile-390.jpg'));
 
-  const soundDefault = await evaluate(
-    client,
-    `JSON.stringify({
-      hidden: document.querySelector('[data-sound-toggle]').hidden,
-      pressed: document.querySelector('[data-sound-toggle]').getAttribute('aria-pressed'),
-      audioStarted: typeof window.__fantomAudioStarted === 'undefined' ? false : window.__fantomAudioStarted
-    })`
-  );
-  const sound = JSON.parse(soundDefault);
-
   await client.send('Page.navigate', { url: BASE + '/booking' });
   await client.once('Page.loadEventFired').catch(() => null);
   await sleep(1600);
@@ -610,8 +600,8 @@ async function run() {
    * до появления классом .is-in. Если наблюдатель не сработает, секции
    * останутся с opacity: 0 и сайт будет выглядеть пустым. Поэтому проверяем
    * именно это: сколько блоков осталось невидимыми после полного прохода
-   * страницы, рисует ли что-нибудь canvas, реагируют ли фонарь и магнит,
-   * и что при prefers-reduced-motion видно всё без исключений.
+   * страницы, нет ли в разметке декоративных слоёв и что при
+   * prefers-reduced-motion видно всё без исключений.
    */
 
   console.log('\n  — Слой движения (1280 px, мышь) —');
@@ -660,76 +650,23 @@ async function run() {
     )
   );
 
-  const inkPainted = await evaluate(
-    client,
-    `(function () {
-      var canvas = document.querySelector('[data-fx-ink]');
-      if (!canvas || !canvas.getContext) return -1;
-      var ctx = canvas.getContext('2d');
-      if (!ctx) return -1;
-      var data;
-      try {
-        data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      } catch (error) {
-        return -2;
-      }
-      var painted = 0;
-      for (var i = 3; i < data.length; i += 4) if (data[i] > 0) painted += 1;
-      return painted;
-    })()`
-  );
-
-  // Синтетическое движение мыши: проверяем не «элемент есть», а «элемент реагирует».
-  /* Движение обрабатывается в requestAnimationFrame, поэтому читать результат
-     сразу после события нельзя — ждём два кадра, иначе проверка врёт. */
-  const afterFrames = (body) =>
-    `new Promise(function (resolve) {
-      ${body}
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () {
-          resolve(typeof read === 'function' ? read() : read);
-        });
-      });
-    })`;
-
-  const torchReacts = await evaluate(
-    client,
-    afterFrames(
-      `var torch = document.querySelector('.fx-torch');
-      if (!torch) { resolve('нет элемента'); return; }
-      window.dispatchEvent(new PointerEvent('pointermove', { pointerType: 'mouse', clientX: 640, clientY: 400 }));
-      var read = function () { return torch.style.getPropertyValue('--fx-x').trim() || 'не задано'; };`
-    ),
-    true
-  );
-
-  const magnetReacts = await evaluate(
-    client,
-    afterFrames(
-      `var button = document.querySelector('[data-fx-magnetic]');
-      if (!button) { resolve('нет кнопки'); return; }
-      var rect = button.getBoundingClientRect();
-      button.dispatchEvent(new PointerEvent('pointermove', {
-        pointerType: 'mouse',
-        clientX: rect.left + rect.width - 2,
-        clientY: rect.top + 4
-      }));
-      var read = function () { return button.style.transform || 'не задано'; };`
-    ),
-    true
-  );
-
-  const osd = JSON.parse(
+  /*
+   * Декоративных слоёв на сайте больше нет: ни canvas, ни фонаря, ни магнита,
+   * ни табло времени. Проверяем, что они действительно не вернулись ни в
+   * разметку, ни в скрипты — иначе на первом экране снова появится движение,
+   * которое конкурирует с текстом.
+   */
+  const decoration = JSON.parse(
     await evaluate(
       client,
       `(function () {
-        var time = document.querySelector('[data-fx-clock]');
-        var osd = document.querySelector('.fx-osd');
         return JSON.stringify({
-          present: Boolean(osd),
-          display: osd ? getComputedStyle(osd).display : 'нет',
-          time: time ? time.textContent.trim() : '',
-          format: time ? /^\\d{2}:\\d{2}:\\d{2}$/.test(time.textContent.trim()) : false
+          canvas: document.querySelectorAll('canvas').length,
+          torch: document.querySelectorAll('.fx-torch').length,
+          magnetic: document.querySelectorAll('[data-fx-magnetic]').length,
+          osd: document.querySelectorAll('.fx-osd').length,
+          sound: document.querySelectorAll('[data-sound-toggle]').length,
+          contactBar: document.querySelectorAll('[data-contact-bar]').length
         });
       })()`
     )
@@ -748,23 +685,19 @@ async function run() {
       return Number(getComputedStyle(el).opacity) < 0.9;
     }).length`
   );
-  const rmTorch = await evaluate(client, `Boolean(document.querySelector('.fx-torch'))`);
+  const rmFxOn = await evaluate(client, `document.documentElement.classList.contains('fx-on')`);
   await client.send('Emulation.setEmulatedMedia', { features: [] });
 
   report.checks = {
     techBannerVisible: mockBanner,
     fxReady,
     fxReveal: fxHidden,
-    fxInkPainted: inkPainted,
-    fxTorch: torchReacts,
-    fxMagnetic: magnetReacts,
-    fxOsd: osd,
+    fxDecoration: decoration,
     fxReducedMotionHidden: rmHidden,
-    fxReducedMotionTorch: rmTorch,
+    fxReducedMotionActive: rmFxOn,
     heroCtaLabels: ctaLabels,
     navHiddenBefore,
     navOpen: nav,
-    soundDefault: sound,
     bookingSlotButtons: slotButtons,
     bookingStep1Active: step1Active,
     bookingBlockedWithoutPackage: blockedWithoutPackage,
@@ -782,7 +715,6 @@ async function run() {
   console.log(`  CTA в hero:                        ${ctaLabels.join(' | ')}`);
   console.log(`  меню до клика:                     display=${navHiddenBefore}`);
   console.log(`  меню после клика:                  display=${nav.display}, aria-expanded=${nav.expanded}, ссылок=${nav.links}`);
-  console.log(`  звук по умолчанию:                 hidden=${sound.hidden}, aria-pressed=${sound.pressed}`);
   console.log(`  кнопок слотов в мастере:           ${slotButtons}`);
   console.log(`  шаг 1 активен на входе:            ${step1Active ? 'да' : 'нет'}`);
   console.log(`  без программы вперёд не пускает:   ${blockedWithoutPackage ? 'да' : 'НЕТ (дыра)'}`);
@@ -810,14 +742,12 @@ async function run() {
     `  блоков не появилось после прокрутки: ${fxHidden.missing} из ${fxHidden.total}` +
       (fxHidden.missing ? ` → ${fxHidden.sample.join(', ')}` : '')
   );
-  console.log(`  canvas «чернил» что-то нарисовал:  ${inkPainted > 0 ? `да (${inkPainted} px)` : `НЕТ (${inkPainted})`}`);
-  console.log(`  фонарь реагирует на курсор:        ${torchReacts}`);
-  console.log(`  магнит на кнопке:                  ${magnetReacts}`);
   console.log(
-    `  табло кадра:                       display=${osd.display}, время="${osd.time}", формат=${osd.format ? 'ок' : 'НЕТ'}`
+    `  декоративных слоёв в разметке:     canvas=${decoration.canvas}, фонарь=${decoration.torch}, ` +
+      `магнит=${decoration.magnetic}, табло=${decoration.osd}, звук=${decoration.sound}, панель=${decoration.contactBar}`
   );
   console.log(`  reduced-motion прячет блоки:       ${rmHidden === 0 ? 'нет, всё видно' : `ДА — ${rmHidden} шт.`}`);
-  console.log(`  reduced-motion оставляет фонарь:   ${rmTorch ? 'ДА (проблема)' : 'нет'}`);
+  console.log(`  reduced-motion оставляет анимацию: ${rmFxOn ? 'ДА (проблема)' : 'нет'}`);
 
   // ── Сводка ───────────────────────────────────────────────────────────
   const bad = rows.filter((r) => !r.ok);
@@ -861,7 +791,6 @@ async function run() {
     `- CTA в hero: ${ctaLabels.join(' | ')}`,
     `- Меню закрыто до клика: ${navHiddenBefore}`,
     `- Меню после клика: display=${nav.display}, aria-expanded=${nav.expanded}, ссылок=${nav.links}`,
-    `- Звук по умолчанию: hidden=${sound.hidden}, aria-pressed=${sound.pressed}`,
     `- Кнопок слотов в мастере: ${slotButtons}`,
     `- Шаг 1 активен на входе: ${step1Active ? 'да' : 'нет'}`,
     `- Без выбранной программы дальше не пускает: ${blockedWithoutPackage ? 'да' : '**НЕТ**'}`,
@@ -888,12 +817,9 @@ async function run() {
     `- Блоков с data-fx: ${fxHidden.total}, из них осталось невидимыми после полной прокрутки: ${
       fxHidden.missing === 0 ? '0 (норма)' : `**${fxHidden.missing}** → ${fxHidden.sample.join(', ')}`
     }`,
-    `- Canvas «чернил» в hero: ${inkPainted > 0 ? `рисует (${inkPainted} непрозрачных пикселей)` : `**пусто (${inkPainted})**`}`,
-    `- Фонарь реагирует на курсор: ${torchReacts}`,
-    `- Магнит на главной кнопке: ${magnetReacts}`,
-    `- Табло кадра: display=${osd.display}, время «${osd.time}», формат ${osd.format ? 'верный' : '**сломан**'}`,
+    `- Декоративных слоёв в разметке нет: canvas=${decoration.canvas}, фонарь=${decoration.torch}, магнит=${decoration.magnetic}, табло=${decoration.osd}, звук=${decoration.sound}, панель контактов=${decoration.contactBar}`,
     `- prefers-reduced-motion, невидимых блоков: ${rmHidden === 0 ? '0 (норма)' : `**${rmHidden}**`}`,
-    `- prefers-reduced-motion, фонарь в DOM: ${rmTorch ? '**есть (проблема)**' : 'нет'}`,
+    `- prefers-reduced-motion, анимация не включается: ${rmFxOn ? '**включилась (проблема)**' : 'нет'}`,
     '',
     'Примеры слотов: ' + JSON.parse(slotLabels).join(', '),
     ''

@@ -1,10 +1,9 @@
 /* FANTOM — клиентский слой.
-   Навигация, атмосферные эффекты, галерея, звук, каталог с фильтрами,
-   шестишаговая запись и аналитика.
+   Навигация, галерея, каталог с фильтрами, пятишаговая запись и аналитика.
 
-   Правила: звук не стартует сам; при prefers-reduced-motion движение выключено;
-   ни один эффект не закрывает контент и кнопку записи; при ошибке данные формы
-   не теряются; в интерфейсе нет ни слова о техническом состоянии стенда. */
+   Правила: при prefers-reduced-motion движение выключено; ни один эффект
+   не закрывает контент и кнопку записи; при ошибке данные формы не теряются;
+   в интерфейсе нет ни слова о техническом состоянии стенда. */
 
 (function () {
   'use strict';
@@ -109,103 +108,6 @@
       targetX = ((event.clientX - rect.left) / rect.width - 0.5) * 18;
       targetY = ((event.clientY - rect.top) / rect.height - 0.5) * 12;
       if (!raf) raf = requestAnimationFrame(step);
-    });
-  }
-
-  /* ── Панель контактов ─────────────────────────────────────────────────── */
-
-  function initContactBar() {
-    var bar = document.querySelector('[data-contact-bar]');
-    if (!bar) return;
-
-    var lastY = window.scrollY;
-    var timer = null;
-    var setHidden = function (hidden) {
-      bar.classList.toggle('is-hidden', hidden);
-    };
-
-    window.addEventListener(
-      'scroll',
-      function () {
-        var y = window.scrollY;
-        if (y > lastY + 8 && y > 320) setHidden(true);
-        else if (y < lastY - 8) setHidden(false);
-        lastY = y;
-      },
-      { passive: true }
-    );
-
-    document.addEventListener('focusin', function (event) {
-      if (event.target.matches('input, textarea, select')) {
-        setHidden(true);
-        clearTimeout(timer);
-      }
-    });
-
-    document.addEventListener('focusout', function (event) {
-      if (event.target.matches('input, textarea, select')) {
-        timer = setTimeout(function () {
-          setHidden(false);
-        }, 400);
-      }
-    });
-  }
-
-  /* ── Звук ─────────────────────────────────────────────────────────────── */
-
-  function initSound() {
-    var button = document.querySelector('[data-sound-toggle]');
-    if (!button || !window.AudioContext) return;
-    button.hidden = false;
-
-    var ctx = null;
-    var master = null;
-    var label = button.querySelector('[data-sound-label]');
-
-    function build() {
-      var AudioCtor = window.AudioContext || window.webkitAudioContext;
-      ctx = new AudioCtor();
-      master = ctx.createGain();
-      master.gain.value = 0;
-      master.connect(ctx.destination);
-
-      var drone = ctx.createOscillator();
-      drone.type = 'sawtooth';
-      drone.frequency.value = 41;
-      var droneGain = ctx.createGain();
-      droneGain.gain.value = 0.05;
-
-      var size = 2 * ctx.sampleRate;
-      var buffer = ctx.createBuffer(1, size, ctx.sampleRate);
-      var data = buffer.getChannelData(0);
-      for (var i = 0; i < size; i += 1) data[i] = (Math.random() * 2 - 1) * 0.5;
-      var noise = ctx.createBufferSource();
-      noise.buffer = buffer;
-      noise.loop = true;
-      var filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 300;
-      var noiseGain = ctx.createGain();
-      noiseGain.gain.value = 0.032;
-
-      drone.connect(droneGain).connect(master);
-      noise.connect(filter).connect(noiseGain).connect(master);
-      drone.start();
-      noise.start();
-    }
-
-    button.addEventListener('click', function () {
-      var pressed = button.getAttribute('aria-pressed') === 'true';
-      if (!ctx) build();
-      if (ctx.state === 'suspended') ctx.resume();
-
-      var next = !pressed;
-      var now = ctx.currentTime;
-      master.gain.cancelScheduledValues(now);
-      master.gain.linearRampToValueAtTime(next ? 0.55 : 0, now + (reduceMotion ? 0.02 : 1.4));
-      button.setAttribute('aria-pressed', next ? 'true' : 'false');
-      if (label) label.textContent = next ? 'Звук включён' : 'Звук выключен';
-      track('sound_toggled', { state: next ? 'on' : 'off' });
     });
   }
 
@@ -1070,8 +972,6 @@
     initHero();
     initReveal();
     initGallery();
-    initSound();
-    initContactBar();
     initPhoneMask();
     initCatalogFilters();
     initBooking();
