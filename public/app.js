@@ -403,6 +403,8 @@
       packageName: '',
       packageDuration: '',
       packagePrice: '',
+      packageNote: '',
+      packageGuests: 0,
       date: form.dataset.initialDate || '',
       dateLabel: '',
       slot: null,
@@ -437,7 +439,8 @@
       date: document.querySelector('[data-summary-date]'),
       time: document.querySelector('[data-summary-time]'),
       guests: document.querySelector('[data-summary-guests]'),
-      price: document.querySelector('[data-summary-price]')
+      price: document.querySelector('[data-summary-price]'),
+      note: document.querySelector('[data-summary-note]')
     };
 
     var initialSlot = form.dataset.initialSlot || '';
@@ -471,12 +474,26 @@
       if (summary.duration) summary.duration.textContent = state.packageDuration || '—';
       if (summary.date) summary.date.textContent = state.dateLabel || formatDateRu(state.date);
       if (summary.time) {
-        summary.time.textContent = state.slot
-          ? timeInput.value + (state.slot.crossesMidnight ? ' (после полуночи)' : '')
-          : '—';
+        if (state.slot) {
+          summary.time.textContent = timeInput.value + (state.slot.crossesMidnight ? ' (после полуночи)' : '');
+        } else if (initialSlot) {
+          // Время пришло из ссылки на витрине. Пока доступность не проверена,
+          // честнее написать «проверяем», чем показать прочерк: посетитель
+          // только что нажал «Забронировать» именно на это время.
+          summary.time.textContent = initialSlot + ' — проверяем';
+        } else {
+          summary.time.textContent = '—';
+        }
       }
       if (summary.guests) summary.guests.textContent = state.guests ? state.guests + ' чел.' : '—';
       if (summary.price) summary.price.textContent = state.packagePrice || 'уточнит администратор';
+      if (summary.note) {
+        // Прайс-лист локации: сколько человек включено и сколько стоит следующий.
+        // Итог по числу гостей не считаем — тарифы у пакетов разные, а ошибка
+        // в цене на живой записи дороже, чем отсутствие авторасчёта.
+        summary.note.textContent = state.packageNote || '';
+        summary.note.hidden = !state.packageNote;
+      }
     }
 
     /* Шаг 1. Программа */
@@ -485,13 +502,19 @@
         form.querySelectorAll('.package-option').forEach(function (other) {
           other.setAttribute('aria-checked', other === button ? 'true' : 'false');
         });
+        var changed = state.packageId !== button.dataset.package;
         state.packageId = button.dataset.package;
         state.packageName = button.dataset.packageName;
         state.packageDuration = button.dataset.packageDuration;
         state.packagePrice = button.dataset.packagePrice;
+        state.packageNote = button.dataset.packageNote || '';
+        state.packageGuests = Number(button.dataset.packageGuests) || 0;
         packageInput.value = state.packageId;
         setError('');
-        syncSummary();
+        // Число гостей подстраиваем под программу только при её смене: если
+        // человек вернулся на шаг 1 и подтвердил тот же пакет, его правки не теряем.
+        if (changed && state.packageGuests) setGuests(state.packageGuests);
+        else syncSummary();
         track('quest_selected', { package: state.packageId });
       });
     });
@@ -503,6 +526,9 @@
         state.packageName = preset.dataset.packageName;
         state.packageDuration = preset.dataset.packageDuration;
         state.packagePrice = preset.dataset.packagePrice;
+        state.packageNote = preset.dataset.packageNote || '';
+        state.packageGuests = Number(preset.dataset.packageGuests) || 0;
+        if (state.packageGuests) setGuests(state.packageGuests);
       }
     }
 
@@ -569,6 +595,10 @@
         slotPicker.innerHTML = '<p class="slot-hint">На этот день свободного времени нет. Выберите другой игровой день.</p>';
         timeInput.value = '';
         state.slot = null;
+        if (initialSlot) {
+          setError('Время ' + initialSlot + ' уже занято, а на этот день свободного времени не осталось.');
+          initialSlot = '';
+        }
         syncSummary();
         return;
       }
@@ -626,6 +656,12 @@
         if (wanted) {
           select(wanted);
           initialSlot = '';
+        } else {
+          // Время из ссылки на витрине уже заняли. Молча оставить прочерк —
+          // худший вариант: посетитель уверен, что выбрал время.
+          setError('Время ' + initialSlot + ' уже занято. Выберите другое — данные формы сохранены.');
+          initialSlot = '';
+          syncSummary();
         }
       }
     }

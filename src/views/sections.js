@@ -20,6 +20,24 @@ const { brandMark } = require('./layout');
 
 const money = (value) => (Number.isFinite(Number(value)) ? Number(value).toLocaleString('ru-RU') + ' ₸' : null);
 
+/**
+ * Согласование числа с существительным.
+ * plural(1, 'отзыв', 'отзыва', 'отзывов') → «отзыв», plural(3, …) → «отзыва».
+ *
+ * Нужна именно функция: рейтинг и число отзывов в 2ГИС живые, их обновляет
+ * владелец. Вписанное руками «343 отзыва» превращается в «341 отзыва», как
+ * только счётчик меняется. То же с числом режимов, персонажей и пунктов.
+ */
+function plural(count, one, few, many) {
+  const value = Math.abs(Number(count) || 0);
+  const hundred = value % 100;
+  const tail = value % 10;
+  if (hundred > 10 && hundred < 20) return many;
+  if (tail > 1 && tail < 5) return few;
+  if (tail === 1) return one;
+  return many;
+}
+
 function sectionHead({ eyebrow, title, lead, id, align = '', as = 'h2' }) {
   const Tag = as;
   // data-fx="signal": заголовок секции появляется как переключение канала —
@@ -28,6 +46,24 @@ function sectionHead({ eyebrow, title, lead, id, align = '', as = 'h2' }) {
   ${eyebrow ? `<p class="eyebrow">${esc(eyebrow)}</p>` : ''}
   <${Tag}${id ? ` id="${esc(id)}"` : ''}>${esc(title)}</${Tag}>
   ${lead ? `<p class="section-lead">${esc(lead)}</p>` : ''}
+</div>`;
+}
+
+/**
+ * Заголовок внутренней страницы.
+ *
+ * До этого на внутренних страницах первый заголовок в разметке был H2:
+ * визуально заголовок есть, а для поисковика и для навигации скринридером
+ * по заголовкам страница оставалась безымянной. Здесь ровно один H1 на
+ * страницу, заголовки секций ниже остаются H2.
+ */
+function pageHead({ eyebrow, title, lead }) {
+  return `<div class="page-head">
+  <div class="wrap page-head-inner">
+    ${eyebrow ? `<p class="eyebrow">${esc(eyebrow)}</p>` : ''}
+    <h1>${esc(title)}</h1>
+    ${lead ? `<p class="section-lead">${esc(lead)}</p>` : ''}
+  </div>
 </div>`;
 }
 
@@ -95,14 +131,16 @@ function hero({ settings, location, quest, packages }) {
     </h1>
 
     <p class="hero-lead">
-      Локация «${esc(quest.name)}»: <b>60 минут</b> внутри сюжета, ${esc(String(quest.characters.length))}
-      персонажа и пять режимов страха. Уровень выбираешь ты — от детского до харда 18+.
+      Локация «${esc(quest.name)}»: <b>${esc(String(quest.durationMinutes))} минут</b> внутри сюжета,
+      ${esc(String(quest.characters.length))} ${plural(quest.characters.length, 'персонаж', 'персонажа', 'персонажей')}
+      и ${esc(String(quest.modes.list.length))} ${plural(quest.modes.list.length, 'режим', 'режима', 'режимов')} страха.
+      Уровень выбираешь ты — от детского до харда 18+.
     </p>
 
     <dl class="hero-facts">
-      <div><dt>Оценка игроков</dt><dd>${esc(String(r.value).replace('.', ','))} / 5 · ${esc(String(r.reviewsCount))} отзыва</dd></div>
-      <div><dt>Длительность</dt><dd>${esc(String(quest.durationMinutes))} минут</dd></div>
-      <div><dt>Режимы</dt><dd>${esc(String(quest.modes.list.length))} уровня страха</dd></div>
+      <div><dt>Оценка игроков</dt><dd>${esc(String(r.value).replace('.', ','))} / 5 · ${esc(String(r.reviewsCount))} ${plural(r.reviewsCount, 'отзыв', 'отзыва', 'отзывов')}</dd></div>
+      <div><dt>Длительность</dt><dd>${esc(String(quest.durationMinutes))} ${plural(quest.durationMinutes, 'минута', 'минуты', 'минут')}</dd></div>
+      <div><dt>Режимы</dt><dd>${esc(String(quest.modes.list.length))} ${plural(quest.modes.list.length, 'уровень', 'уровня', 'уровней')} страха</dd></div>
       ${from ? `<div><dt>Стоимость</dt><dd>от ${esc(money(from.priceFrom))}</dd></div>` : ''}
     </dl>
 
@@ -123,15 +161,19 @@ function hero({ settings, location, quest, packages }) {
 /* ── БЕГУЩАЯ СТРОКА ─────────────────────────────────────────────────────── */
 
 function marquee({ settings, quest }) {
+  /*
+   * Строка не повторяет то, что уже сказано выше: рейтинг, число отзывов,
+   * длительность и режимы стоят в hero и в блоке проверенных данных сразу под
+   * лентой. Здесь — то, чего в первых двух экранах нет.
+   */
   const items = [
-    `${esc(String(settings.rating.value).replace('.', ','))} из 5 — оценка в ${esc(settings.rating.sourceLabel)}`,
-    `${esc(String(settings.rating.reviewsCount))} отзыва`,
-    `${esc(String(settings.rating.photosCount))} фото локации`,
-    `${esc(String(quest.durationMinutes))} минут внутри`,
-    `${esc(String(quest.characters.length))} персонажа`,
-    `${esc(String(quest.modes.list.length))} режима страха`,
-    esc(settings.brand.tagline),
-    `${esc(settings.hours.label)}`
+    `${esc(settings.brand.tagline)}`,
+    `${esc(String(settings.rating.photosCount))} фото локации в ${esc(settings.rating.sourceLabel)}`,
+    `${esc(settings.hours.label)} ежедневно, есть ночные сеансы`,
+    `видео моменты с игры включены в программы`,
+    `кинорум KinoLand: фильмы, PlayStation, караоке`,
+    `${esc(settings.brand.displayName)} — ${esc(settings.city)}`,
+    `${esc(settings.brand.legalName)}`
   ];
   const run = items.map((item) => `<span class="marquee-item">${item}</span>`).join('<span class="marquee-dot" aria-hidden="true"></span>');
 
@@ -152,7 +194,7 @@ function trust({ settings, location, quest }) {
     <div class="trust-item trust-item--rating">
       <b>${esc(String(r.value).replace('.', ','))}</b>
       <span class="trust-stars" aria-hidden="true">★★★★★</span>
-      <small>${esc(r.sourceLabel)} · ${esc(String(r.reviewsCount))} отзыва · ${esc(String(r.ratingsCount))} оценки</small>
+      <small>${esc(r.sourceLabel)} · ${esc(String(r.reviewsCount))} ${plural(r.reviewsCount, 'отзыв', 'отзыва', 'отзывов')} · ${esc(String(r.ratingsCount))} ${plural(r.ratingsCount, 'оценка', 'оценки', 'оценок')}</small>
       ${sourceTag('Открыть отзывы', r.sourceUrl)}
     </div>
     <div class="trust-item">
@@ -178,16 +220,16 @@ function trust({ settings, location, quest }) {
 /* ── БЛИЖАЙШИЕ ИГРЫ ─────────────────────────────────────────────────────── */
 
 function slotsBoard({ days, quest, settings, limit = 6 }) {
-  const rows = [];
+  const now = new Date().toISOString();
+  const open = [];
   for (const day of days) {
     for (const slot of day.slots) {
       if (slot.status !== 'open') continue;
-      if (slot.startIso < new Date().toISOString()) continue;
-      rows.push({ day, slot });
-      if (rows.length >= limit) break;
+      if (slot.startIso < now) continue;
+      open.push({ day, slot });
     }
-    if (rows.length >= limit) break;
   }
+  const rows = open.slice(0, limit);
 
   return `<section class="section section--slots" id="slots">
   <div class="wrap">
@@ -221,6 +263,18 @@ function slotsBoard({ days, quest, settings, limit = 6 }) {
         <p>Выберите сценарий и дату — свободные слоты появятся сразу.</p>
         <a class="btn btn-blood" href="/booking">Перейти к записи</a>
       </div>`
+    }
+
+    ${
+      /* Прямо говорим, что это витрина, а не полный список: раньше блок
+         показывал 6 сеансов, а форма — 9, и разница выглядела как ошибка. */
+      rows.length
+        ? `<p class="section-note">
+      Показаны ближайшие ${rows.length} ${plural(rows.length, 'слот', 'слота', 'слотов')}.
+      Всего свободно ${esc(String(open.length))} ${plural(open.length, 'слот', 'слота', 'слотов')} —
+      полный список открывается в форме записи. Свободное время не зависит от выбранной программы.
+    </p>`
+        : ''
     }
   </div>
 </section>`;
@@ -291,13 +345,17 @@ function catalogCard(item) {
     <ul class="quest-card-meta">
       <li>${icon('clock2')}<span>${esc(item.durationLabel || '—')}</span></li>
       <li>${icon('mask')}<span>${esc(item.audienceLabel || '—')}</span></li>
-      <li>${icon('star')}<span>${esc(item.baseGuests ? item.baseGuests + ' человек включено' : '—')}</span></li>
+      <li>${icon('star')}<span>${item.baseGuests ? esc(String(item.baseGuests)) + ' ' + plural(item.baseGuests, 'человек', 'человека', 'человек') + ' включено' : '—'}</span></li>
     </ul>
 
     <ul class="quest-card-list">
       ${item.includes.slice(0, 5).map((line) => `<li>${esc(line)}</li>`).join('')}
     </ul>
-    ${item.includes.length > 5 ? `<p class="quest-card-more">и ещё ${item.includes.length - 5} пункта в программе</p>` : ''}
+    ${
+      item.includes.length > 5
+        ? `<p class="quest-card-more">и ещё ${item.includes.length - 5} ${plural(item.includes.length - 5, 'пункт', 'пункта', 'пунктов')} в программе</p>`
+        : ''
+    }
 
     <p class="quest-card-price">
       <b>${item.priceLabel ? esc(item.priceLabel) : pending('цена уточняется')}</b>
@@ -424,7 +482,7 @@ function story({ content, quest }) {
         ${first.source ? `<p class="source-line">${esc(first.source)}</p>` : ''}
         <p class="story-lead-meta">
           ${esc(quest.name)} · ${esc(String(quest.durationMinutes))} минут ·
-          ${esc(String(quest.characters.length))} персонажа
+          ${esc(String(quest.characters.length))} ${plural(quest.characters.length, 'персонаж', 'персонажа', 'персонажей')}
         </p>
       </div>
 
@@ -512,7 +570,7 @@ function gallery({ gallery, settings, location, withViewer = true, limit = 0 }) 
   </div>
 
   <div class="wrap gallery-foot">
-    <p class="gallery-hint">Свайп или прокрутка — ещё ${Math.max(items.length - 3, 0)} кадров</p>
+    <p class="gallery-hint">Свайп или прокрутка — ещё ${Math.max(items.length - 3, 0)} ${plural(Math.max(items.length - 3, 0), 'кадр', 'кадра', 'кадров')}</p>
     <div class="gallery-actions">
       <a class="btn btn-outline" href="/gallery">Вся галерея</a>
       <a class="btn btn-ghost" href="${esc(location ? location.galleryUrl : settings.rating.sourceUrl)}" rel="noopener" target="_blank">
@@ -587,12 +645,12 @@ function numbers({ settings, quest, packages, location }) {
     })}
 
     <ul class="numbers">
-      <li data-fx="rise"><b class="fx-dot">${esc(String(settings.rating.reviewsCount))}</b><span>отзыва в ${esc(settings.rating.sourceLabel)}</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(settings.rating.reviewsCount))}</b><span>${plural(settings.rating.reviewsCount, 'отзыв', 'отзыва', 'отзывов')} в ${esc(settings.rating.sourceLabel)}</span></li>
       <li data-fx="rise"><b class="fx-dot">${esc(String(settings.rating.photosCount))}</b><span>фото локации</span></li>
-      <li data-fx="rise"><b class="fx-dot">${esc(String(quest.durationMinutes))}</b><span>минут длится квест</span></li>
-      <li data-fx="rise"><b class="fx-dot">${esc(String(quest.characters.length))}</b><span>персонажа в сценарии</span></li>
-      <li data-fx="rise"><b class="fx-dot">${esc(String(quest.modes.list.length))}</b><span>режима страха</span></li>
-      <li data-fx="rise"><b class="fx-dot">${esc(String(confirmedPackages))}</b><span>программы с ценой</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(quest.durationMinutes))}</b><span>${plural(quest.durationMinutes, 'минута', 'минуты', 'минут')} длится квест</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(quest.characters.length))}</b><span>${plural(quest.characters.length, 'персонаж', 'персонажа', 'персонажей')} в сценарии</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(quest.modes.list.length))}</b><span>${plural(quest.modes.list.length, 'режим', 'режима', 'режимов')} страха</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(confirmedPackages))}</b><span>${plural(confirmedPackages, 'программа', 'программы', 'программ')} с ценой</span></li>
     </ul>
 
     <div class="numbers-sources">
@@ -635,10 +693,10 @@ function reviews({ settings, reviews, limit = 6 }) {
         <span class="trust-stars" aria-hidden="true">★★★★★</span>
       </div>
       <ul class="rating-facts">
-        <li><b>${esc(String(r.reviewsCount))}</b><span>отзыва</span></li>
-        <li><b>${esc(String(r.ratingsCount))}</b><span>оценки</span></li>
+        <li><b>${esc(String(r.reviewsCount))}</b><span>${plural(r.reviewsCount, 'отзыв', 'отзыва', 'отзывов')}</span></li>
+        <li><b>${esc(String(r.ratingsCount))}</b><span>${plural(r.ratingsCount, 'оценка', 'оценки', 'оценок')}</span></li>
         <li><b>${esc(String(r.photosCount))}</b><span>фото</span></li>
-        <li><b>${esc(String(r.photosWithReviewsCount))}</b><span>отзыва с фото</span></li>
+        <li><b>${esc(String(r.photosWithReviewsCount))}</b><span>${plural(r.photosWithReviewsCount, 'отзыв', 'отзыва', 'отзывов')} с фото</span></li>
       </ul>
       <a class="btn btn-outline" href="${esc(r.sourceUrl)}" rel="noopener nofollow" target="_blank" data-cta="reviews">
         Смотреть все отзывы
@@ -786,6 +844,19 @@ function beforeYouGo({ settings, location, quest }) {
 function bookingWizard({ settings, packages, days, quest, initialPackage, initialDate, preselectedSlot }) {
   const bookable = packages.filter((item) => item.confirmed);
 
+  /*
+   * Стартовое число гостей берётся из программы, на которую пришёл посетитель,
+   * иначе — из основной программы. Раньше в форме стояло жёсткое «4» при цене
+   * «2 человека — 17 500 ₸»: сводка противоречила сама себе и это выглядело как
+   * ошибка расчёта. Ровно то, на что указал аудит.
+   */
+  const initialProgram =
+    bookable.filter((item) => item.id === initialPackage)[0] ||
+    bookable.filter((item) => item.primary)[0] ||
+    bookable[0] ||
+    null;
+  const baseGuests = (initialProgram && initialProgram.baseGuests) || 4;
+
   return `<div class="booking-layout">
   <form class="wizard" id="booking-form" novalidate
         data-initial-package="${esc(initialPackage || '')}"
@@ -813,7 +884,9 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
               data-package="${esc(item.id)}"
               data-package-name="${esc(item.name)}"
               data-package-duration="${esc(item.durationLabel || '')}"
-              data-package-price="${esc(item.priceLabel || '')}">
+              data-package-price="${esc(item.priceLabel || '')}"
+              data-package-guests="${esc(String(item.baseGuests || ''))}"
+              data-package-note="${esc(item.priceNote || '')}">
           <span class="package-option-name">${esc(item.name)}</span>
           <span class="package-option-price">${item.priceLabel ? esc(item.priceLabel) : pending('уточняется')}</span>
           <span class="package-option-meta">${esc(item.durationLabel || '')}${item.durationLabel && item.audienceLabel ? ' · ' : ''}${esc(item.audienceLabel || '')}</span>
@@ -870,13 +943,14 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       <legend class="wizard-legend">Шаг 4 из 6. Сколько вас будет</legend>
       <div class="stepper" role="group" aria-label="Количество игроков">
         <button class="stepper-btn" type="button" data-guests-minus aria-label="Меньше">−</button>
-        <span class="stepper-value" data-guests-value aria-live="polite">4</span>
+        <span class="stepper-value" data-guests-value aria-live="polite">${esc(String(baseGuests))}</span>
         <button class="stepper-btn" type="button" data-guests-plus aria-label="Больше">+</button>
       </div>
-      <input type="hidden" name="guests" id="guests" value="4">
-      <p class="wizard-hint">
-        Точную доплату за дополнительных игроков подтвердит администратор: на прайс-листах указана доплата
-        за каждого следующего гостя.
+      <input type="hidden" name="guests" id="guests" value="${esc(String(baseGuests))}">
+      <p class="wizard-hint" data-guests-hint>
+        В стоимость выбранной программы включено ${esc(String(baseGuests))}
+        ${plural(baseGuests, 'человек', 'человека', 'человек')}. Число игроков можно менять: доплата за
+        каждого следующего указана в карточке программы и в прайс-листе локации.
       </p>
       <div class="wizard-nav">
         <button class="btn btn-ghost" type="button" data-back="3">Назад</button>
@@ -952,6 +1026,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
         <li><span>Гостей</span><b data-summary-guests>—</b></li>
         <li><span>Цена</span><b data-summary-price class="pending-value">—</b></li>
       </ul>
+      <p class="summary-price-note" data-summary-note hidden></p>
       <p class="summary-note">
         Адрес: ${esc(settings.brand.displayName)}, ${esc(settings.city)}. Оплата на месте:
         ${esc(settings.payments.methods.join(', ').toLowerCase())}.
@@ -1094,7 +1169,9 @@ function finalCta({ settings, content, location }) {
 
 module.exports = {
   money,
+  plural,
   sectionHead,
+  pageHead,
   pending,
   sourceTag,
   icon,

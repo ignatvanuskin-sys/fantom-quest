@@ -747,6 +747,67 @@ async function run() {
     assert.deepStrictEqual(fixed, [], 'фиксированные ширины в базовых стилях: ' + fixed.join(', '));
   });
 
+  await test('Вёрстка: у каждой страницы ровно один H1', async () => {
+    const paths = [
+      '/',
+      '/quests',
+      '/prices',
+      '/gallery',
+      '/reviews',
+      '/faq',
+      '/contacts',
+      '/privacy',
+      '/booking',
+      '/booking/status'
+    ];
+    for (const path of paths) {
+      const res = await get(path);
+      const count = (res.text.match(/<h1[\s>]/g) || []).length;
+      assert.strictEqual(count, 1, `${path}: найдено H1 в разметке — ${count}`);
+    }
+  });
+
+  await test('Русский язык: числа согласованы с существительными', async () => {
+    const { plural } = require('../src/views/sections');
+
+    assert.strictEqual(plural(1, 'отзыв', 'отзыва', 'отзывов'), 'отзыв');
+    assert.strictEqual(plural(3, 'отзыв', 'отзыва', 'отзывов'), 'отзыва');
+    assert.strictEqual(plural(5, 'отзыв', 'отзыва', 'отзывов'), 'отзывов');
+    assert.strictEqual(plural(11, 'отзыв', 'отзыва', 'отзывов'), 'отзывов');
+    assert.strictEqual(plural(21, 'отзыв', 'отзыва', 'отзывов'), 'отзыв');
+    assert.strictEqual(plural(343, 'отзыв', 'отзыва', 'отзывов'), 'отзыва');
+    assert.strictEqual(plural(0, 'отзыв', 'отзыва', 'отзывов'), 'отзывов');
+
+    const home = await get('/');
+    for (const wrong of ['5 уровня страха', '5 режима страха', 'и ещё 1 пункта', '2 человек включено']) {
+      assert.ok(!home.text.includes(wrong), `число не согласовано: «${wrong}»`);
+    }
+    assert.ok(home.text.includes('уровней страха'), 'нужна форма «уровней страха»');
+  });
+
+  await test('Запись: число гостей по умолчанию берётся из программы', async () => {
+    const horror = await get('/booking?package=paket-horror');
+    const horrorGuests = horror.text.match(/id="guests" value="(\d+)"/);
+    assert.ok(horrorGuests, 'нет поля guests');
+    assert.strictEqual(horrorGuests[1], '2', 'в «Пакет Хоррор» включено 2 человека');
+    assert.ok(horror.text.includes('data-package-guests="2"'), 'программа должна сообщать, сколько человек включено');
+    assert.ok(horror.text.includes('data-summary-note'), 'в сводке нужна строка с прайс-листом');
+
+    const mini = await get('/booking?package=level-mini');
+    const miniGuests = mini.text.match(/id="guests" value="(\d+)"/);
+    assert.strictEqual(miniGuests[1], '6', 'в Level mini включено 6 человек');
+  });
+
+  await test('Витрина слотов не выдаёт себя за полный список', async () => {
+    const home = await get('/');
+    if (!home.text.includes('slot-board')) return;
+    assert.ok(/Показаны ближайшие \d+/.test(home.text), 'нужно число показанных сеансов');
+    assert.ok(
+      home.text.includes('полный список открывается в форме записи'),
+      'нужно прямо сказать, что витрина неполная'
+    );
+  });
+
   await test('Форма записи: labels, aria, touch-target, honeypot', async () => {
     const page = await get('/booking');
     for (const needle of ['aria-label="Программа"', 'for="phone"', 'for="name"', 'aria-live', 'role="radiogroup"', 'autocomplete="tel"', 'aria-required']) {

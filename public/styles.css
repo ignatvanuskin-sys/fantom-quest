@@ -792,6 +792,28 @@ p {
   color: var(--line-3);
 }
 
+/* Заголовок внутренней страницы: единственный H1 на странице. */
+.page-head {
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #0c0c0c, var(--void));
+}
+
+.page-head-inner {
+  padding-top: 26px;
+  padding-bottom: 26px;
+  max-width: 68ch;
+}
+
+.page-head h1 {
+  font-size: clamp(24px, 7vw, 44px);
+  margin: 0;
+}
+
+.page-head .section-lead {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
 .tag {
   display: inline-block;
   font-family: var(--mono);
@@ -2276,6 +2298,20 @@ p {
   margin: 12px 0 0;
   font-size: 12.5px;
   color: var(--muted);
+}
+
+/* Прайс-лист выбранной программы: сколько человек включено и сколько стоит
+   следующий. Стоит рядом с ценой, потому что главный вопрос перед отправкой
+   телефона — «сколько это в итоге». */
+.summary-price-note {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bone-dim);
 }
 
 .success {

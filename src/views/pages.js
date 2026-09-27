@@ -91,6 +91,13 @@ function questPage(data) {
   const { settings, location, quest, packages, reviews, faq, content, days } = data;
   const features = quest.modes.list;
 
+  // Самая низкая подтверждённая цена. Аудит верно заметил: человек приходит по
+  // кнопке «Квесты» уже с вопросом «сколько», а цена на этой странице была
+  // ниже первого экрана.
+  const from = packages
+    .filter((item) => item.confirmed && Number.isFinite(Number(item.priceFrom)))
+    .sort((a, b) => Number(a.priceFrom) - Number(b.priceFrom))[0];
+
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Квесты', path: '/quests' }])}
 
@@ -101,10 +108,11 @@ function questPage(data) {
           <h1>${esc(quest.name)}</h1>
           <p class="lede">${esc(quest.longDescription)}</p>
           <dl class="hero-facts">
-            <div><dt>Длительность</dt><dd>${esc(String(quest.durationMinutes))} минут</dd></div>
+            <div><dt>Длительность</dt><dd>${esc(String(quest.durationMinutes))} ${s.plural(quest.durationMinutes, 'минута', 'минуты', 'минут')}</dd></div>
             <div><dt>Персонажи</dt><dd>${esc(String(quest.characters.length))}</dd></div>
-            <div><dt>Режимы</dt><dd>${esc(String(features.length))} уровня страха</dd></div>
+            <div><dt>Режимы</dt><dd>${esc(String(features.length))} ${s.plural(features.length, 'уровень', 'уровня', 'уровней')} страха</dd></div>
             <div><dt>Состав</dt><dd>от 2 человек</dd></div>
+            ${from ? `<div><dt>Стоимость</dt><dd>от ${esc(s.money(from.priceFrom))}</dd></div>` : ''}
           </dl>
           <div class="hero-actions">
             <a class="btn btn-blood btn-xl" href="/booking">Забронировать</a>
@@ -156,6 +164,11 @@ function pricesPage(data) {
   const { settings, location, packages, pricePhotos, addons, quest } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Программы', path: '/prices' }])}
+    ${s.pageHead({
+      eyebrow: 'Программы и цены',
+      title: 'Цены и программы FANTOM',
+      lead: 'Цены — с прайс-листов локации. Оплата на месте, сайт не принимает платежи.'
+    })}
     ${s.catalog({ packages, settings, quest })}
 
     <section class="section section--alt">
@@ -225,6 +238,11 @@ function galleryPage(data) {
   const { settings, location, gallery, pricePhotos } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Галерея', path: '/gallery' }])}
+    ${s.pageHead({
+      eyebrow: 'Фотографии локации',
+      title: 'Галерея FANTOM',
+      lead: 'Кадры из локации, от актёров и гостей — из галереи FANTOM в 2ГИС. Нажмите на кадр, чтобы открыть его на весь экран.'
+    })}
     ${s.gallery({ gallery, settings, location })}
     <section class="section section--alt">
       <div class="wrap">
@@ -268,6 +286,11 @@ function reviewsPage(data) {
   const { settings, location, reviews, content } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Отзывы', path: '/reviews' }])}
+    ${s.pageHead({
+      eyebrow: 'Отзывы игроков',
+      title: 'Отзывы о FANTOM',
+      lead: 'Отзывы приведены дословно и только с источником. Реальные оценки и ответы организации — в карточке 2ГИС.'
+    })}
     ${s.reviews({ settings, reviews, limit: 0 })}
     <section class="section section--alt">
       <div class="wrap">
@@ -303,6 +326,11 @@ function faqPage(data) {
   const { settings, location, faq } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Вопросы', path: '/faq' }])}
+    ${s.pageHead({
+      eyebrow: 'Вопросы и ответы',
+      title: 'Частые вопросы о квесте',
+      lead: 'То, что чаще всего спрашивают перед первой игрой. Ответов, которых у нас нет, мы не придумываем — их подтверждает владелец.'
+    })}
     ${s.faq({ faq })}
     ${s.beforeYouGo({ settings, location, quest: data.quest })}
     ${s.finalCta({ settings, content: data.content, location })}
@@ -328,6 +356,11 @@ function contactsPage(data) {
   const { settings, location, quest } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Контакты', path: '/contacts' }])}
+    ${s.pageHead({
+      eyebrow: 'Как нас найти',
+      title: `Контакты FANTOM в ${settings.city}`,
+      lead: 'Адрес, график, телефон и мессенджеры. Вход с улицы, цокольный этаж.'
+    })}
     ${s.locationSection({ settings, location })}
     <section class="section">
       <div class="wrap two-col">
@@ -369,6 +402,11 @@ function contactsPage(data) {
 function bookingPage(data) {
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Запись', path: '/booking' }])}
+    ${s.pageHead({
+      eyebrow: 'Бронирование',
+      title: 'Запись на игру',
+      lead: 'Шесть шагов: программа, дата, время, гости, контакты, проверка. Заявка бесплатная — оплата на месте.'
+    })}
     ${bookingBlock(data)}
     <section class="section section--alt">
       <div class="wrap two-col">
@@ -410,7 +448,12 @@ function bookingStatusPage(data) {
     ])}
     <section class="section">
       <div class="wrap narrow">
-        ${s.sectionHead({ eyebrow: 'Проверка', title: 'Статус заявки', lead: 'Введите номер заявки и телефон, на который она оформлялась.' })}
+        ${s.sectionHead({
+          eyebrow: 'Проверка',
+          title: 'Статус заявки',
+          lead: 'Введите номер заявки и телефон, на который она оформлялась.',
+          as: 'h1'
+        })}
         <form class="panel" id="status-form" novalidate>
           <div class="field">
             <label for="status-ref">Номер заявки</label>
@@ -453,9 +496,13 @@ function privacyPage(data) {
   const { settings, location } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Обработка данных', path: '/privacy' }])}
+    ${s.pageHead({
+      eyebrow: 'Документы',
+      title: 'Обработка персональных данных',
+      lead: 'Какие данные сайт запрашивает, зачем и как долго хранит.'
+    })}
     <section class="section">
       <div class="wrap narrow prose">
-        ${s.sectionHead({ eyebrow: 'Документы', title: 'Обработка персональных данных' })}
         <div class="legal-note">
           <b>Черновик. Требуется юридическая проверка.</b>
           <p>Текст описывает то, как реально работает сайт. Перед публикацией его должен проверить юрист на соответствие законодательству Казахстана о персональных данных.</p>
