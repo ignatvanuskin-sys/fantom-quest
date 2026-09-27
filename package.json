@@ -13,6 +13,8 @@
     "seed": "node src/seed.js --reset",
     "seed:dry": "node src/seed.js",
     "test": "node tests/run.js",
+    "deploy": "vercel --prod",
+    "check:deploy": "node tools/check-deployment.js",
     "shots": "node tests/screenshots.js",
     "shots:first-screen": "node tests/screenshots.js --viewport-only --out=tests/artifacts/first-screen",
     "shots:probe": "node tests/screenshots.js --probe=/ --probe-width=390"

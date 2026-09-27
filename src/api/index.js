@@ -47,6 +47,10 @@ function timingSafeEqual(a, b) {
 }
 
 function isAuthorized(req) {
+  // На развёрнутом стенде со стандартным токеном-заглушкой доступ закрыт
+  // полностью: этот токен опубликован в репозитории и известен всем.
+  if (config.adminLoginDisabled) return false;
+
   const header = String(req.headers.authorization || '');
   const bearer = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   const cookie = String(req.headers.cookie || '')
@@ -84,7 +88,13 @@ async function sitePayload() {
       : null,
     nextOpenSlot: next,
     serverTime: new Date().toISOString(),
-    unconfirmedFields: data.settings.unconfirmedFields || []
+    unconfirmedFields: data.settings.unconfirmedFields || [],
+    storage: {
+      driver: config.storeDriver,
+      persistent: config.persistentStorage,
+      demoMode: config.demoMode,
+      reason: config.demoReason
+    }
   };
 }
 
@@ -219,14 +229,18 @@ function register(router) {
       sendJson(res, 201, {
         ok: true,
         booking: bookings.publicView(result.booking),
+        demoMode: config.demoMode,
         notification: {
           mockMode: result.notification.mockMode,
+          demoMode: config.demoMode,
           delivered: result.notification.channels.filter((c) => c.ok).map((c) => c.channel),
           manualWhatsappLink: result.notification.manual.whatsappLink
         },
-        message:
-          'Заявка принята. Администратор свяжется по выбранному каналу. ' +
-          'Слот закреплён за вами, пока заявка активна.'
+        message: config.demoMode
+          ? 'Демонстрационный стенд: заявка показана для примера, но не сохранена и не отправлена ' +
+            'администратору. Для реальной брони напишите в WhatsApp.'
+          : 'Заявка принята. Администратор свяжется по выбранному каналу. ' +
+            'Слот закреплён за вами, пока заявка активна.'
       });
     } catch (error) {
       if (error instanceof bookings.BookingError) {
@@ -259,6 +273,15 @@ function register(router) {
   // --- Админка ---
 
   router.post(/^\/api\/admin\/login$/, async (req, res) => {
+    if (config.adminLoginDisabled) {
+      throw new HttpError(
+        503,
+        'admin_token_not_configured',
+        'Админка отключена: на этом стенде не задан собственный ADMIN_TOKEN. ' +
+          'Стандартный токен-заглушка не используется, потому что опубликован в репозитории. ' +
+          'Добавьте ADMIN_TOKEN в переменные окружения проекта и переопубликуйте сборку.'
+      );
+    }
     const limit = ratelimit.check(`admin-login:${clientIp(req)}`, { windowMs: 15 * 60 * 1000, max: 10 });
     if (!limit.allowed) throw new HttpError(429, 'rate_limited', 'Слишком много попыток входа.');
     const body = await parseBody(req);

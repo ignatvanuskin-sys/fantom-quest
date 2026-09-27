@@ -2187,3 +2187,54 @@ p {
     color: #000;
   }
 }
+
+
+/* ── Плашки честности: демо-стенд и предупреждения ──────────────────────── */
+
+.alert {
+  border: 1px solid var(--line-2);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 22px;
+  background: rgba(14, 16, 18, 0.8);
+  font-size: 14.5px;
+  color: var(--bone-dim);
+}
+
+.alert b {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--bone);
+  font-size: 15.5px;
+}
+
+.alert p {
+  margin: 0;
+}
+
+.alert a {
+  color: var(--acid);
+}
+
+.alert--demo {
+  border-color: rgba(214, 178, 94, 0.55);
+  border-left-color: var(--amber);
+  background: linear-gradient(180deg, rgba(214, 178, 94, 0.1), rgba(14, 16, 18, 0.85));
+}
+
+.alert--demo b {
+  color: var(--amber);
+}
+
+/* Демо-режим важнее обычного mock-предупреждения, поэтому акцент сильнее,
+   но без красной тревоги: это не ошибка, а ограничение стенда. */
+.mock-banner--demo {
+  background: linear-gradient(90deg, rgba(214, 178, 94, 0.18), rgba(214, 178, 94, 0.02));
+  border-top-color: rgba(214, 178, 94, 0.55);
+  color: #f6e6bd;
+}
+
+.mock-banner--demo strong {
+  color: var(--amber);
+}

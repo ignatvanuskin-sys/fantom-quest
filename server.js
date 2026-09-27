@@ -84,7 +84,13 @@ router.get(/^\/healthz$/, async (req, res) => {
     ok: true,
     version: config.version,
     timezone: data.settings.timezone,
+    platform: config.platform,
     mockMode: config.mockMode,
+    storage: {
+      driver: config.storeDriver,
+      persistent: config.persistentStorage,
+      demoMode: config.demoMode
+    },
     bookings: data.bookings.length,
     serverTime: new Date().toISOString()
   });
@@ -107,6 +113,23 @@ async function handle(req, res) {
   const url = new URL(req.url, config.siteUrl);
 
   try {
+    // Стенд без постоянного хранилища: изменения из админки исчезнут вместе
+    // с инстансом. Честнее отказать, чем делать вид, что настройки сохранены.
+    // Вход и выход из админки остаются доступны — просмотр работает.
+    const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    if (
+      isWrite &&
+      config.demoMode &&
+      url.pathname.startsWith('/api/admin') &&
+      !/\/api\/admin\/(login|logout)$/.test(url.pathname)
+    ) {
+      throw new HttpError(
+        503,
+        'demo_mode',
+        config.demoReason + ' Заявки и настройки на этом стенде доступны только для просмотра.'
+      );
+    }
+
     const matched = router.match(req.method, url.pathname);
     if (matched) {
       const params = await resolveParams(matched, url.pathname);
@@ -126,9 +149,11 @@ async function handle(req, res) {
     }
     sendJson(res, 404, { ok: false, code: 'not_found', message: 'Маршрут не найден.' });
   } catch (error) {
-    const status = error instanceof HttpError ? error.status : error.status || 500;
+    const expected = error instanceof HttpError;
+    const status = expected ? error.status : error.status || 500;
     const code = error.code || 'internal_error';
-    if (status >= 500) {
+    // Осознанные отказы (HttpError) не считаем сбоями и не пишем в журнал ошибок.
+    if (status >= 500 && !expected) {
       console.error('[error]', error);
       await audit.append('server.error', { code, message: error.message, path: url.pathname });
     }
@@ -136,8 +161,12 @@ async function handle(req, res) {
       res.end();
       return;
     }
+    // Текст HttpError написан для пользователя и должен дойти как есть.
+    // Общая формулировка — только для непредвиденных сбоев.
     const message =
-      status >= 500 ? 'Внутренняя ошибка сервера. Заявка не потеряна — попробуйте ещё раз.' : error.message;
+      expected || status < 500
+        ? error.message
+        : 'Внутренняя ошибка сервера. Заявка не потеряна — попробуйте ещё раз.';
     if ((req.headers.accept || '').includes('application/json') || url.pathname.startsWith('/api/')) {
       sendJson(res, status, { ok: false, code, message, ...(error.extra || {}) });
     } else {
@@ -184,29 +213,76 @@ const server = http.createServer((req, res) => {
 server.keepAliveTimeout = 15000;
 server.headersTimeout = 20000;
 
-async function start() {
-  ensureDataDirs();
-  const data = await store.load();
-  await audit.append('server.started', {
-    version: config.version,
-    mockMode: config.mockMode,
-    timezone: data.settings.timezone
-  });
+/**
+ * Слушаем порт синхронно, во время загрузки модуля.
+ *
+ * Это требование Vercel: платформа находит Node-сервер именно по вызову
+ * server.listen() при инициализации модуля и дальше проксирует на него
+ * запросы через внутренний порт. Поэтому здесь нельзя прятать listen()
+ * за `require.main === module` или за await.
+ */
+function listen() {
+  if (server.listening) return;
+  if (config.host) server.listen(config.port, config.host);
+  else server.listen(config.port);
+}
 
-  server.listen(config.port, config.host, () => {
-    const base = `http://${config.host}:${config.port}`;
-    console.log('');
-    console.log(`  Fantom — хоррор-квест, Усть-Каменогорск`);
-    console.log(`  Сайт:     ${base}`);
-    console.log(`  Админка:  ${base}/admin`);
-    console.log(`  API:      ${base}/api/site`);
-    console.log(`  Таймзона: ${data.settings.timezone}`);
-    console.log(`  Режим:    ${config.mockMode ? 'MOCK — заявки не уходят бизнесу' : 'LIVE — заявки уходят администратору'}`);
-    if (config.isDefaultAdminToken) {
-      console.log('  ВНИМАНИЕ: используется стандартный ADMIN_TOKEN. Замените его в .env до публикации.');
-    }
-    console.log('');
+function logBanner(data) {
+  if (config.isVercel || process.env.QUIET === '1') return;
+  const base = `http://${config.host || 'localhost'}:${server.address() ? server.address().port : config.port}`;
+  console.log('');
+  console.log('  Fantom — хоррор-квест, Усть-Каменогорск');
+  console.log(`  Сайт:     ${base}`);
+  console.log(`  Админка:  ${base}/admin`);
+  console.log(`  API:      ${base}/api/site`);
+  console.log(`  Таймзона: ${data ? data.settings.timezone : config.timezone}`);
+  console.log(
+    `  Хранилище: ${config.storeDriver}${config.persistentStorage ? ' (постоянное)' : ' (ВРЕМЕННОЕ — данные не сохраняются)'}`
+  );
+  console.log(`  Режим:    ${config.mockMode ? 'MOCK — заявки не уходят бизнесу' : 'LIVE — заявки уходят администратору'}`);
+  if (config.demoMode) {
+    console.log('  ВНИМАНИЕ: ' + config.demoReason);
+  }
+  if (config.isDefaultAdminToken) {
+    console.log('  ВНИМАНИЕ: используется стандартный ADMIN_TOKEN. Замените его в .env до публикации.');
+  }
+  console.log('');
+}
+
+let bootPromise = null;
+
+/** Идемпотентная инициализация: создание каталогов, база, первая запись в журнал. */
+function boot() {
+  if (!bootPromise) {
+    bootPromise = (async () => {
+      ensureDataDirs();
+      const data = await store.load();
+      await audit.append('server.started', {
+        version: config.version,
+        platform: config.platform,
+        storeDriver: config.storeDriver,
+        mockMode: config.mockMode,
+        timezone: data.settings.timezone
+      });
+      return data;
+    })().catch((error) => {
+      // Прогрев не должен ронять процесс: база догрузится при первом запросе.
+      console.error('[boot] инициализация не завершилась:', error.message);
+      return null;
+    });
+  }
+  return bootPromise;
+}
+
+async function start() {
+  listen();
+  const data = await boot();
+  logBanner(data);
+  await new Promise((resolve) => {
+    if (server.listening) return resolve();
+    server.once('listening', resolve);
   });
+  return server;
 }
 
 function shutdown(signal) {
@@ -218,11 +294,18 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-if (require.main === module) {
-  start().catch((error) => {
-    console.error('Не удалось запустить сервер:', error.message);
-    process.exit(1);
-  });
-}
+// На Vercel порт назначает платформа: получив http-сервер в default export,
+// она сама вызывает listen() на внутреннем порту. Собственный вызов там
+// приводит к ERR_SERVER_ALREADY_LISTEN и запросы зависают без ответа.
+// Локально (и в тестах) порт выбираем мы.
+if (!config.isVercel) listen();
+boot().then(logBanner);
 
-module.exports = { server, start, handle };
+// Vercel требует, чтобы default export модуля был функцией или http-сервером:
+// иначе он отвечает «Invalid export found in module». Экспортируем сам сервер,
+// а именованные экспорты (нужны тестам и локальному запуску) навешиваем
+// свойствами на тот же объект, чтобы требование выполнялось.
+module.exports = server;
+module.exports.server = server;
+module.exports.start = start;
+module.exports.handle = handle;

@@ -640,6 +640,164 @@ async function run() {
     assert.ok(button[0].includes('aria-pressed="false"'), 'звук по умолчанию выключен');
   });
 
+  // ── Режимы стенда: постоянное хранилище и демо-режим ──────────────────
+  console.log('\n  — Режимы стенда (Vercel) —');
+
+  await test('Обычный режим сообщает о постоянном хранилище', async () => {
+    const res = await get('/api/site');
+    assert.strictEqual(res.json.storage.driver, 'file');
+    assert.strictEqual(res.json.storage.persistent, true);
+    assert.strictEqual(res.json.storage.demoMode, false);
+    assert.strictEqual(res.json.storage.reason, null);
+  });
+
+  await test('Демо-режим: заявка доходит до success-state, но помечена как несохранённая', async () => {
+    const original = config.demoMode;
+    config.demoMode = true;
+    try {
+      ratelimit.reset();
+      const res = await post('/api/bookings', validBooking({ date: futureDate(26), time: '16:00' }));
+      assert.strictEqual(res.status, 201, 'демо-стенд должен показывать полный flow: ' + JSON.stringify(res.json));
+      assert.strictEqual(res.json.demoMode, true);
+      assert.ok(/Демонстрационный/.test(res.json.message), 'сообщение должно прямо называть стенд демонстрационным');
+      assert.ok(res.json.notification.demoMode, 'флаг демо-режима должен быть и в блоке уведомления');
+    } finally {
+      config.demoMode = original;
+    }
+  });
+
+  await test('Демо-режим: админские изменения отклоняются с 503, а не теряются молча', async () => {
+    const original = config.demoMode;
+    config.demoMode = true;
+    try {
+      const res = await patch(
+        '/api/admin/settings',
+        { hours: { shiftStart: '10:00', shiftEnd: '23:00' } },
+        { headers: { cookie } }
+      );
+      assert.strictEqual(res.status, 503);
+      assert.strictEqual(res.json.code, 'demo_mode');
+      assert.ok(/хранилище/i.test(res.json.message), 'нужно объяснить причину отказа');
+    } finally {
+      config.demoMode = original;
+    }
+  });
+
+  await test('Демо-режим: вход в админку и просмотр остаются доступны', async () => {
+    const original = config.demoMode;
+    config.demoMode = true;
+    try {
+      const login = await post('/api/admin/login', { token: 'test-admin-token' });
+      assert.strictEqual(login.status, 200, 'вход должен работать: просмотр данных не запрещён');
+      const list = await get('/api/admin/bookings', { headers: { cookie } });
+      assert.strictEqual(list.status, 200);
+    } finally {
+      config.demoMode = original;
+    }
+  });
+
+  await test('Демо-режим: предупреждение видно на сайте и на странице записи', async () => {
+    const original = config.demoMode;
+    config.demoMode = true;
+    try {
+      const home = await get('/');
+      assert.ok(home.text.includes('Демонстрационный стенд'), 'нет плашки демо-режима на главной');
+      const booking = await get('/booking');
+      assert.ok(booking.text.includes('Демонстрационный стенд'), 'нет предупреждения на странице записи');
+      assert.ok(booking.text.includes('WhatsApp'), 'нужна рабочая альтернатива для реальной брони');
+    } finally {
+      config.demoMode = original;
+    }
+  });
+
+  await test('Стенд без постоянного хранилища не уведомляет бизнес даже при MOCK_MODE=false', async () => {
+    // Правило безопасности: demoMode принудительно включает mock-режим,
+    // иначе тестовая заявка ушла бы администратору как настоящая.
+    const original = { demo: config.demoMode, mock: config.mockMode, driver: config.storeDriver };
+    try {
+      const { execFileSync } = require('child_process');
+      const output = execFileSync(
+        process.execPath,
+        [
+          '-e',
+          "const c=require('./src/config');process.stdout.write(JSON.stringify({mock:c.mockMode,driver:c.storeDriver,demo:c.demoMode}))"
+        ],
+        {
+          cwd: path.join(__dirname, '..'),
+          env: { ...process.env, VERCEL: '1', MOCK_MODE: 'false', DATA_DIR: '', STORE_DRIVER: '' },
+          encoding: 'utf8'
+        }
+      );
+      const parsed = JSON.parse(output);
+      assert.strictEqual(parsed.demo, true, 'на Vercel без KV должен включаться demoMode');
+      assert.strictEqual(parsed.driver, 'file', 'без KV драйвер остаётся файловым');
+      assert.strictEqual(parsed.mock, true, 'demoMode обязан принудительно включать MOCK_MODE');
+    } finally {
+      Object.assign(config, original);
+    }
+  });
+
+  await test('На развёрнутом стенде стандартный токен админки не пускает', async () => {
+    // Безопасность: токен-заглушка лежит в открытом репозитории. Если владелец
+    // не задал ADMIN_TOKEN, админка должна закрыться, а не пустить всех.
+    const original = config.adminLoginDisabled;
+    config.adminLoginDisabled = true;
+    try {
+      const login = await post('/api/admin/login', { token: 'dev-admin-token-change-me' });
+      assert.strictEqual(login.status, 503);
+      assert.strictEqual(login.json.code, 'admin_token_not_configured');
+      assert.ok(/ADMIN_TOKEN/.test(login.json.message), 'нужно указать, что именно сделать');
+
+      const direct = await get('/api/admin/bookings', { headers: { cookie } });
+      assert.strictEqual(direct.status, 401, 'старая кука тоже не должна работать');
+    } finally {
+      config.adminLoginDisabled = original;
+    }
+  });
+
+  await test('Пустая переменная окружения не превращается в ноль', async () => {
+    // Регрессия: в Vercel владелец может завести переменную с пустым значением.
+    // `Number('')` даёт 0, из-за чего RATE_LIMIT_MAX= блокировал весь API.
+    const { execFileSync } = require('child_process');
+    const output = execFileSync(
+      process.execPath,
+      [
+        '-e',
+        "const c=require('./src/config');process.stdout.write(JSON.stringify({max:c.rateLimit.max,win:c.rateLimit.windowMs,fill:c.form.minFillSeconds,port:c.port,driver:c.storeDriver}))"
+      ],
+      {
+        cwd: path.join(__dirname, '..'),
+        env: {
+          ...process.env,
+          RATE_LIMIT_MAX: '',
+          RATE_LIMIT_WINDOW_MS: '',
+          FORM_MIN_FILL_SECONDS: '',
+          PORT: '',
+          VERCEL: '',
+          DATA_DIR: '',
+          KV_REST_API_URL: '',
+          KV_REST_API_TOKEN: ''
+        },
+        encoding: 'utf8'
+      }
+    );
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.max, 8, 'пустой RATE_LIMIT_MAX должен давать 8, а не 0');
+    assert.strictEqual(parsed.win, 600000);
+    assert.strictEqual(parsed.fill, 3);
+    assert.strictEqual(parsed.port, 3000);
+    assert.strictEqual(parsed.driver, 'file');
+  });
+
+  await test('Файловое хранилище переживает «перезапуск» инстанса', async () => {
+    // Проверяем главное свойство постоянного хранилища: то, что записано,
+    // читается другим процессом, а не живёт только в памяти.
+    const snapshot = JSON.parse(await fsp.readFile(config.dbFile, 'utf8'));
+    assert.ok(Array.isArray(snapshot.bookings), 'в файле должна быть коллекция заявок');
+    assert.ok(snapshot.bookings.length >= 1, 'заявки должны быть записаны на диск');
+    assert.strictEqual(snapshot.settings.timezone, 'Asia/Almaty');
+  });
+
   // ── Итог ──────────────────────────────────────────────────────────────
   const failed = results.filter((r) => !r.ok);
   console.log('\n' + '─'.repeat(80));

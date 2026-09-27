@@ -1,24 +1,33 @@
 'use strict';
 
 /**
- * Хранилище данных: один JSON-файл с атомарной записью и мьютексом.
+ * Хранилище данных.
  *
- * Почему так:
- *  - Атомарность резервирования слота требует read-check-write внутри
- *    критической секции. Мьютекс сериализует такие операции в процессе,
- *    а запись через временный файл + rename защищает от повреждения
- *    данных при падении процесса.
- *  - Для одного инстанса этого достаточно. При переходе на несколько
- *    инстансов замените драйвер на PostgreSQL (см. README, «Миграция»).
+ * Три драйвера с одинаковым интерфейсом:
+ *
+ *   file   — один JSON-файл с атомарной записью. По умолчанию вне Vercel.
+ *   kv     — Redis по REST-протоколу (Upstash / Vercel KV). Единственный
+ *            драйвер, который даёт постоянное хранилище на Vercel.
+ *   memory — ничего не сохраняет. Используется как аварийный режим, когда
+ *            запись на диск недоступна, чтобы приложение не падало с 500.
+ *
+ * Атомарность резервирования слота обеспечивается транзакцией:
+ * мьютекс в процессе + распределённая блокировка (для kv) вокруг
+ * чтения-изменения-записи. Без блокировки два инстанса могли бы продать
+ * один и тот же слот.
  */
 
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
+const crypto = require('crypto');
 const { createDefaultData } = require('./seed-data');
 
 const locks = new Map();
 let cache = null;
+let fsAvailable = true;
+let warned = false;
+let override = null;
 
 function config() {
   return require('./config');
@@ -38,10 +47,27 @@ function withLock(key, fn) {
   return next;
 }
 
+function warnOnce(message) {
+  if (warned) return;
+  warned = true;
+  console.warn('[store] ' + message);
+}
+
+// ── Драйвер: файл ────────────────────────────────────────────────────────────
+
 function ensureDirs() {
+  if (!fsAvailable) return;
   const cfg = config();
-  for (const dir of [cfg.dataDir, path.dirname(cfg.auditFile)]) {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  try {
+    for (const dir of [cfg.dataDir, path.dirname(cfg.auditFile)]) {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    }
+  } catch (error) {
+    fsAvailable = false;
+    warnOnce(
+      `каталог данных недоступен для записи (${error.code || error.message}). ` +
+        'Работаем в памяти: данные не сохраняются. Подключите KV или задайте DATA_DIR.'
+    );
   }
 }
 
@@ -67,14 +93,132 @@ async function readRaw() {
           'Восстановите файл из бэкапа или выполните: npm run seed'
       );
     }
+    if (error.code === 'EROFS' || error.code === 'EACCES' || error.code === 'EPERM') {
+      fsAvailable = false;
+      warnOnce(`файловая система только для чтения (${error.code}). Работаем в памяти.`);
+      return null;
+    }
     throw error;
   }
 }
 
-async function load() {
-  if (cache) return cache;
-  ensureDirs();
-  const raw = await readRaw();
+const fileDriver = {
+  name: 'file',
+  volatile: false,
+  async load() {
+    ensureDirs();
+    if (!fsAvailable) return null;
+    return readRaw();
+  },
+  async save(data) {
+    ensureDirs();
+    if (!fsAvailable) return;
+    await atomicWrite(config().dbFile, JSON.stringify(data, null, 2));
+  }
+};
+
+// ── Драйвер: память ──────────────────────────────────────────────────────────
+
+const memoryDriver = {
+  name: 'memory',
+  volatile: false,
+  async load() {
+    return null;
+  },
+  async save() {
+    /* намеренно ничего не сохраняем */
+  }
+};
+
+// ── Драйвер: Redis по REST (Upstash / Vercel KV) ─────────────────────────────
+
+const DB_KEY = 'fantom:db';
+const LOCK_KEY = 'fantom:lock';
+const LOCK_TTL_MS = 10000;
+const LOCK_WAIT_MS = 5000;
+
+function createKvDriver({ url, token }) {
+  async function cmd(args) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(args)
+    });
+    if (!response.ok) {
+      throw new Error(`KV ответил HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    if (payload && payload.error) throw new Error(`KV: ${payload.error}`);
+    return payload ? payload.result : null;
+  }
+
+  async function acquireLock() {
+    const token_ = crypto.randomBytes(12).toString('hex');
+    const deadline = Date.now() + LOCK_WAIT_MS;
+    for (;;) {
+      const result = await cmd(['SET', LOCK_KEY, token_, 'NX', 'PX', String(LOCK_TTL_MS)]);
+      if (result === 'OK') break;
+      if (Date.now() > deadline) {
+        throw new Error('Не удалось получить блокировку хранилища. Повторите запрос.');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 60 + Math.floor(Math.random() * 90)));
+    }
+    // Снимаем блокировку только если она наша: иначе можно удалить чужую,
+    // если наша успела истечь по TTL.
+    return async () => {
+      const script =
+        "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+      await cmd(['EVAL', script, '1', LOCK_KEY, token_]).catch(() => {});
+    };
+  }
+
+  return {
+    name: 'kv',
+    volatile: true, // перед каждой транзакцией перечитываем состояние
+    acquireLock,
+    async load() {
+      const raw = await cmd(['GET', DB_KEY]);
+      if (!raw) return null;
+      if (typeof raw === 'object') return raw;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        throw new Error('KV: значение по ключу ' + DB_KEY + ' повреждено и не читается как JSON.');
+      }
+    },
+    async save(data) {
+      await cmd(['SET', DB_KEY, JSON.stringify(data)]);
+    }
+  };
+}
+
+// ── Выбор драйвера ───────────────────────────────────────────────────────────
+
+function activeDriver() {
+  if (override) return override;
+  const cfg = config();
+  if (cfg.storeDriver === 'kv') {
+    if (!cfg.kv) {
+      throw new Error('STORE_DRIVER=kv, но KV_REST_API_URL / KV_REST_API_TOKEN не заданы.');
+    }
+    return createKvDriver(cfg.kv);
+  }
+  if (cfg.storeDriver === 'memory') return memoryDriver;
+  return fsAvailable ? fileDriver : memoryDriver;
+}
+
+/** Тестовый шов: позволяет подменить драйвер без переменных окружения. */
+function configure(next) {
+  override = next || null;
+  cache = null;
+}
+
+// ── Ядро ─────────────────────────────────────────────────────────────────────
+
+async function load(force) {
+  if (cache && !force) return cache;
+  const driver = activeDriver();
+  const raw = await driver.load();
   if (!raw) {
     cache = createDefaultData();
     await persist();
@@ -104,33 +248,51 @@ function migrate(data) {
 
 async function persist() {
   if (!cache) return;
-  const cfg = config();
+  const driver = activeDriver();
   const copy = { ...cache, meta: { ...cache.meta, updatedAt: new Date().toISOString() } };
   cache.meta = copy.meta;
-  await atomicWrite(cfg.dbFile, JSON.stringify(copy, null, 2));
+  try {
+    await driver.save(copy);
+  } catch (error) {
+    if (driver.name === 'file') {
+      // Деградация вместо падения: приложение продолжает работать,
+      // но данные остаются только в памяти.
+      fsAvailable = false;
+      warnOnce(`не удалось записать базу (${error.code || error.message}). Работаем в памяти.`);
+      return;
+    }
+    throw error; // KV: ошибку обязан увидеть вызывающий, чтобы транзакция откатилась
+  }
 }
 
-/** Чтение в режиме только для чтения. Возвращает живой объект — не мутируйте. */
+/** Чтение. Возвращает живой объект — не мутируйте его вне транзакции. */
 async function read() {
   return load();
 }
 
 /**
- * Мутирующая транзакция под глобальным мьютексом.
+ * Мутирующая транзакция.
  * fn получает объект данных, может его менять и вернуть результат.
- * Изменения сохраняются на диск только если fn не бросил исключение.
+ * Изменения сохраняются только если fn не бросил исключение.
  */
 async function transaction(fn) {
   return withLock('db', async () => {
-    await load();
-    const snapshot = JSON.parse(JSON.stringify(cache));
+    const driver = activeDriver();
+    const release = driver.acquireLock ? await driver.acquireLock() : null;
     try {
-      const result = await fn(cache);
-      await persist();
-      return result;
-    } catch (error) {
-      cache = snapshot; // откат в памяти
-      throw error;
+      if (driver.volatile) cache = null; // чужие изменения важнее локального кэша
+      await load();
+      const snapshot = JSON.parse(JSON.stringify(cache));
+      try {
+        const result = await fn(cache);
+        await persist();
+        return result;
+      } catch (error) {
+        cache = snapshot; // откат в памяти
+        throw error;
+      }
+    } finally {
+      if (release) await release();
     }
   });
 }
@@ -145,4 +307,16 @@ function invalidate() {
   cache = null;
 }
 
-module.exports = { load, read, transaction, persist, resetToDefaults, invalidate, withLock, atomicWrite, ensureDirs };
+module.exports = {
+  load,
+  read,
+  transaction,
+  persist,
+  resetToDefaults,
+  invalidate,
+  withLock,
+  atomicWrite,
+  ensureDirs,
+  configure,
+  driverName: () => activeDriver().name
+};

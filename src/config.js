@@ -1,5 +1,6 @@
 'use strict';
 
+const os = require('os');
 const path = require('path');
 const { load } = require('./lib/env');
 const pkg = require('../package.json');
@@ -14,16 +15,56 @@ function bool(value, fallback) {
   return String(value).toLowerCase() === 'true' || String(value) === '1';
 }
 
+/**
+ * Пустая переменная окружения — это «не задано», а не ноль.
+ * `Number('')` возвращает 0, поэтому RATE_LIMIT_MAX= (пустое значение)
+ * раньше превращался в 0 и блокировал все запросы к API.
+ */
 function int(value, fallback) {
+  if (value === undefined || value === null || String(value).trim() === '') return fallback;
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
 
-const siteUrl = String(env.SITE_URL || `http://localhost:${int(env.PORT, 3000)}`).replace(/\/+$/, '');
+/** Пустая переменная окружения — «не задано», а не пустая строка. */
+function str(value, fallback = '') {
+  return value === undefined || value === null || String(value).trim() === '' ? fallback : String(value);
+}
 
-// DATA_DIR позволяет тестам и staging-окружению работать на отдельной базе
-// и не трогать production-данные.
-const dataDir = env.DATA_DIR ? path.resolve(env.DATA_DIR) : path.join(ROOT, 'data');
+// ── Платформа ────────────────────────────────────────────────────────────────
+// На Vercel файловая система доступна только для чтения, а /tmp — эфемерный:
+// он живёт в пределах одного прогретого инстанса и теряется вместе с ним.
+// Поэтому «файловый» драйвер на Vercel не является постоянным хранилищем,
+// и это должно быть видно и в API, и в интерфейсе.
+const isVercel = Boolean(env.VERCEL || env.VERCEL_ENV);
+
+// Upstash Redis и Vercel KV используют один и тот же REST-протокол,
+// поэтому поддерживаются оба набора переменных окружения.
+const kvUrl = str(env.KV_REST_API_URL) || str(env.UPSTASH_REDIS_REST_URL);
+const kvToken = str(env.KV_REST_API_TOKEN) || str(env.UPSTASH_REDIS_REST_TOKEN);
+const kvConfigured = Boolean(kvUrl && kvToken);
+
+const storeDriver = env.STORE_DRIVER || (kvConfigured ? 'kv' : 'file');
+
+// Постоянное хранилище: KV всегда, файл — только вне Vercel.
+const persistentStorage = storeDriver === 'kv' ? true : !isVercel;
+const demoMode = !persistentStorage;
+
+// ── Адреса ───────────────────────────────────────────────────────────────────
+const vercelHost = str(env.VERCEL_PROJECT_PRODUCTION_URL) || str(env.VERCEL_URL);
+const port = int(env.PORT, 3000);
+const siteUrl = String(
+  env.SITE_URL || (vercelHost ? `https://${vercelHost}` : `http://localhost:${port}`)
+).replace(/\/+$/, '');
+
+// DATA_DIR позволяет тестам и staging-окружению работать на отдельной базе.
+// На Vercel каталог проекта только для чтения, поэтому база уходит в /tmp.
+const dataDir =
+  env.DATA_DIR && !isVercel
+    ? path.resolve(env.DATA_DIR)
+    : isVercel
+      ? path.join(os.tmpdir(), 'fantom-data')
+      : path.join(ROOT, 'data');
 
 const config = {
   version: pkg.version,
@@ -34,15 +75,34 @@ const config = {
   auditFile: path.join(dataDir, 'audit.log.jsonl'),
   docsDir: path.join(ROOT, 'docs'),
 
-  port: int(env.PORT, 3000),
-  host: env.HOST || '127.0.0.1',
+  platform: isVercel ? 'vercel' : 'node',
+  isVercel,
+  // Стандартный токен-заглушка лежит в открытом репозитории, поэтому он
+  // допустим только на локальной машине. На развёрнутом стенде админка
+  // полностью закрывается, пока владелец не задаст свой ADMIN_TOKEN.
+  adminLoginDisabled:
+    isVercel && (!str(env.ADMIN_TOKEN) || str(env.ADMIN_TOKEN) === 'dev-admin-token-change-me'),
+  storeDriver,
+  kv: kvConfigured ? { url: kvUrl, token: kvToken } : null,
+  persistentStorage,
+  demoMode,
+
+  port,
+  // На Vercel слушаем все интерфейсы: платформа сама проксирует запросы
+  // на внутренний порт. Привязка к 127.0.0.1 там не нужна и вредна.
+  host: isVercel ? null : env.HOST || '127.0.0.1',
   siteUrl,
   timezone: env.SITE_TIMEZONE || 'Asia/Almaty',
 
-  adminToken: env.ADMIN_TOKEN || 'dev-admin-token-change-me',
-  isDefaultAdminToken: !env.ADMIN_TOKEN || env.ADMIN_TOKEN === 'dev-admin-token-change-me',
+  adminToken: str(env.ADMIN_TOKEN) || 'dev-admin-token-change-me',
+  isDefaultAdminToken: !str(env.ADMIN_TOKEN) || str(env.ADMIN_TOKEN) === 'dev-admin-token-change-me',
 
-  mockMode: bool(env.MOCK_MODE, true),
+  // Стенд без постоянного хранилища обязан молчать: заявка не сохранена,
+  // значит её нельзя ни подтвердить, ни отследить, ни показать в админке.
+  // Уведомление бизнесу в таком режиме создало бы обязательство, которое
+  // нечем исполнить. Поэтому demoMode принудительно включает MOCK_MODE,
+  // даже если в переменных окружения стоит MOCK_MODE=false.
+  mockMode: demoMode ? true : bool(env.MOCK_MODE, true),
 
   notifications: {
     telegramBotToken: env.TELEGRAM_BOT_TOKEN || '',
@@ -78,5 +138,20 @@ const config = {
 };
 
 config.isMockMode = config.mockMode;
+
+/**
+ * Человекочитаемое объяснение ограничений стенда.
+ * Именно getter, а не значение: причина должна соответствовать текущему
+ * config.demoMode, иначе сообщение разойдётся с фактическим поведением.
+ */
+Object.defineProperty(config, 'demoReason', {
+  enumerable: true,
+  get() {
+    return this.demoMode
+      ? 'Постоянное хранилище не подключено: заявки не сохраняются между запусками ' +
+          'инстанса и не отправляются бизнесу.'
+      : null;
+  }
+});
 
 module.exports = config;

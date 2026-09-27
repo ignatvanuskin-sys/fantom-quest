@@ -21,8 +21,13 @@ function sweep(now, windowMs) {
  * @returns {{allowed: boolean, remaining: number, retryAfterSec: number}}
  */
 function check(key, options = {}) {
-  const windowMs = options.windowMs ?? 10 * 60 * 1000;
-  const max = options.max ?? 8;
+  // Нулевой или отрицательный лимит означал бы «запрещено всё» и полностью
+  // выключил бы API из-за одной опечатки в конфигурации. Считаем это
+  // незаданным значением.
+  const rawWindow = Number(options.windowMs);
+  const rawMax = Number(options.max);
+  const windowMs = Number.isFinite(rawWindow) && rawWindow > 0 ? rawWindow : 10 * 60 * 1000;
+  const max = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 8;
   const now = Date.now();
   sweep(now, windowMs);
 

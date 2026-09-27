@@ -1,4 +1,5 @@
 node_modules/
+.vercel
 data/db.json
 data/*.tmp
 data/audit.log.jsonl
@@ -9,3 +10,7 @@ Thumbs.db
 tests/artifacts/
 media-output/
 *.log
+
+.vercel
+.env*
+.admin-token.txt

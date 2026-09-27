@@ -57,12 +57,32 @@ function brandMarkSvg() {
   </svg>`;
 }
 
+/**
+ * Плашка честности. Два независимых предупреждения:
+ *  - demoMode — у стенда нет постоянного хранилища (например, деплой на Vercel
+ *    без подключённого KV): заявки не переживут перезапуск инстанса;
+ *  - MOCK_MODE — заявки не уходят реальному бизнесу.
+ * Показываем их, пока оба условия сняты не будут.
+ */
 function mockBanner() {
-  if (!config.mockMode) return '';
-  return `<div class="mock-banner" role="status">
+  const parts = [];
+  if (config.demoMode) {
+    parts.push(
+      '<b>Демонстрационный стенд.</b> Постоянное хранилище не подключено: заявки не сохраняются ' +
+        'и не отправляются бизнесу. Для реальной брони используйте WhatsApp.'
+    );
+  }
+  if (config.mockMode) {
+    parts.push(
+      'Тестовый режим <code>MOCK_MODE</code>: заявки не уходят реальному бизнесу.'
+    );
+  }
+  if (!parts.length) return '';
+
+  return `<div class="mock-banner${config.demoMode ? ' mock-banner--demo' : ''}" role="status">
     <div class="wrap">
-      <strong>Тестовый режим (MOCK_MODE)</strong>
-      <span>Заявки сохраняются в базу, но <b>не отправляются реальному бизнесу</b>. Перед публикацией выключите MOCK_MODE и заполните <code>.env</code>.</span>
+      <strong>${config.demoMode ? 'Демо-режим' : 'Тестовый режим'}</strong>
+      <span>${parts.join(' ')}</span>
     </div>
   </div>`;
 }

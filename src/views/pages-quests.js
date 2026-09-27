@@ -1,5 +1,6 @@
 'use strict';
 
+const config = require('../config');
 const { esc } = require('../lib/validate');
 const { page } = require('./layout');
 const c = require('./components');
@@ -232,6 +233,21 @@ function booking({ settings, location, quests, initialQuest, initialDate, presel
           title: 'Выбрать квест и время',
           text: 'Три шага. Заявка ничего не оплачивает — администратор подтвердит время в выбранном канале.'
         })}
+
+        ${
+          config.demoMode
+            ? `<div class="alert alert--demo" role="status">
+          <b>Это демонстрационный стенд.</b>
+          <p>
+            Постоянное хранилище не подключено, поэтому заявка <b>не сохраняется и не попадает
+            администратору</b>. Форма работает полностью — можно пройти все три шага и увидеть
+            результат. Для реальной брони напишите в
+            <a href="${esc(settings.whatsappUrl)}" rel="noopener">WhatsApp</a> или позвоните
+            <a href="tel:${esc(settings.phoneE164)}">${esc(settings.phone)}</a>.
+          </p>
+        </div>`
+            : ''
+        }
 
         <div class="booking-layout">
           <form class="booking-form" id="booking-form" novalidate
