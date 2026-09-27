@@ -1,15 +1,30 @@
 'use strict';
 
+/**
+ * Секции страниц.
+ *
+ * Каждая секция имеет собственный характер, чтобы страница читалась как
+ * последовательность сцен, а не как однообразный список блоков:
+ * hero — полноэкранный кадр, бегущая строка — тонкая полоса, каталог —
+ * крупные карточки, персонажи — тёмная сетка, страх — шкала, сюжет —
+ * редакционная вёрстка в две колонки, цифры — крупные числа, отзывы — цитаты,
+ * запись — контрастный интерфейс.
+ *
+ * В публичном интерфейсе нет ни одного слова о хранилище, mock-режиме,
+ * уведомлениях и прочей внутренней технике: посетитель видит продукт.
+ */
+
 const config = require('../config');
 const { esc } = require('../lib/validate');
 const { brandMark } = require('./layout');
 
-const money = (value) => (Number.isFinite(value) ? value.toLocaleString('ru-RU') + ' ₸' : null);
+const money = (value) => (Number.isFinite(Number(value)) ? Number(value).toLocaleString('ru-RU') + ' ₸' : null);
 
-function sectionHead({ eyebrow, title, lead, id, align = '' }) {
+function sectionHead({ eyebrow, title, lead, id, align = '', as = 'h2' }) {
+  const Tag = as;
   return `<div class="section-head${align ? ' section-head--' + align : ''}">
   ${eyebrow ? `<p class="eyebrow">${esc(eyebrow)}</p>` : ''}
-  <h2${id ? ` id="${esc(id)}"` : ''}>${esc(title)}</h2>
+  <${Tag}${id ? ` id="${esc(id)}"` : ''}>${esc(title)}</${Tag}>
   ${lead ? `<p class="section-lead">${esc(lead)}</p>` : ''}
 </div>`;
 }
@@ -34,18 +49,22 @@ const ICONS = {
   pizza: '<path d="M12 4l8 16H4z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="14" r="1.6"/><circle cx="9.5" cy="17" r="1.3"/>',
   burger: '<path d="M4 9h16M4 13h16M6 17h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="6" r="2"/>',
   star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
-  film2: '<path d="M4 6h16v12H4z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 10l5 3-5 3z"/>'
+  pin: '<path d="M12 2c3.9 0 7 3.1 7 7 0 5-7 13-7 13S5 14 5 9c0-3.9 3.1-7 7-7z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9" r="2.6" fill="none" stroke="currentColor" stroke-width="2"/>',
+  clock2: '<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2"/>'
 };
 
 function icon(name) {
   const path = ICONS[name] || ICONS.star;
-  return `<svg class="feature-icon" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false">${path}</svg>`;
+  return `<svg class="icon" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false">${path}</svg>`;
 }
 
 /* ── HERO ───────────────────────────────────────────────────────────────── */
 
-function hero({ settings, location, quest, packages, ctaHref = '/booking' }) {
-  const from = packages.filter((p) => p.priceFrom).sort((a, b) => a.priceFrom - b.priceFrom)[0];
+function hero({ settings, location, quest, packages }) {
+  const confirmed = packages.filter((item) => item.confirmed && item.priceFrom);
+  const from = confirmed.slice().sort((a, b) => a.priceFrom - b.priceFrom)[0];
+  const r = settings.rating;
+
   return `<section class="hero" data-hero>
   <div class="hero-media" aria-hidden="true">
     <img src="/images/quests/nun-hood-1440.webp" alt="" width="1440" height="2636" fetchpriority="high" decoding="async">
@@ -56,33 +75,33 @@ function hero({ settings, location, quest, packages, ctaHref = '/booking' }) {
   <div class="wrap hero-inner">
     <p class="hero-kicker">
       <span class="pulse" aria-hidden="true"></span>
-      Хоррор-квест · ${esc(settings.city)}
+      Хоррор-квесты · ${esc(settings.city)}
     </p>
 
     <h1 class="hero-title">
-      <span class="hero-title-brand">${brandMark(56)} Fantom</span>
-      <span class="hero-title-line">Испытай свой страх</span>
+      <span class="hero-title-brand">${brandMark(52)} Fantom</span>
+      <span class="hero-title-line">Ты уверен, что хочешь войти?</span>
     </h1>
 
     <p class="hero-lead">
-      Локация «${esc(quest.name)}». <b>60 минут</b> внутри сюжета,
-      три персонажа и пять режимов — от детского до харда 18+.
+      Локация «${esc(quest.name)}»: <b>60 минут</b> внутри сюжета, ${esc(String(quest.characters.length))}
+      персонажа и пять режимов страха. Уровень выбираешь ты — от детского до харда 18+.
     </p>
 
     <dl class="hero-facts">
-      <div><dt>Длительность</dt><dd>60 минут</dd></div>
-      <div><dt>Режимы</dt><dd>5 уровней страха</dd></div>
+      <div><dt>Оценка игроков</dt><dd>${esc(String(r.value).replace('.', ','))} / 5 · ${esc(String(r.reviewsCount))} отзыва</dd></div>
+      <div><dt>Длительность</dt><dd>${esc(String(quest.durationMinutes))} минут</dd></div>
+      <div><dt>Режимы</dt><dd>${esc(String(quest.modes.list.length))} уровня страха</dd></div>
       ${from ? `<div><dt>Стоимость</dt><dd>от ${esc(money(from.priceFrom))}</dd></div>` : ''}
-      <div><dt>Адрес</dt><dd>${esc(location.streetAddress)}</dd></div>
     </dl>
 
     <div class="hero-actions">
-      <a class="btn btn-blood btn-xl" href="${esc(ctaHref)}" data-cta="hero">Забронировать</a>
-      <a class="btn btn-outline btn-xl" href="${esc(settings.whatsappUrl)}" rel="noopener" data-cta="whatsapp">Спросить в WhatsApp</a>
+      <a class="btn btn-blood btn-xl" href="/booking" data-cta="hero">Забронировать</a>
+      <a class="btn btn-outline btn-xl" href="#quests" data-cta="catalog">Выбрать квест</a>
     </div>
 
     <p class="hero-note">
-      Заявка бесплатная, ничего не списываем. Администратор подтвердит время в WhatsApp.
+      ${esc(location.streetAddress)} · ${esc(settings.hours.label)} · оплата на месте
     </p>
   </div>
 
@@ -90,9 +109,32 @@ function hero({ settings, location, quest, packages, ctaHref = '/booking' }) {
 </section>`;
 }
 
+/* ── БЕГУЩАЯ СТРОКА ─────────────────────────────────────────────────────── */
+
+function marquee({ settings, quest }) {
+  const items = [
+    `${esc(String(settings.rating.value).replace('.', ','))} из 5 — оценка в ${esc(settings.rating.sourceLabel)}`,
+    `${esc(String(settings.rating.reviewsCount))} отзыва`,
+    `${esc(String(settings.rating.photosCount))} фото локации`,
+    `${esc(String(quest.durationMinutes))} минут внутри`,
+    `${esc(String(quest.characters.length))} персонажа`,
+    `${esc(String(quest.modes.list.length))} режима страха`,
+    esc(settings.brand.tagline),
+    `${esc(settings.hours.label)}`
+  ];
+  const run = items.map((item) => `<span class="marquee-item">${item}</span>`).join('<span class="marquee-dot" aria-hidden="true"></span>');
+
+  return `<section class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <div class="marquee-run">${run}</div>
+    <div class="marquee-run">${run}</div>
+  </div>
+</section>`;
+}
+
 /* ── TRUST ──────────────────────────────────────────────────────────────── */
 
-function trust({ settings, location }) {
+function trust({ settings, location, quest }) {
   const r = settings.rating;
   return `<section class="trust" id="trust" aria-label="Проверенные данные">
   <div class="wrap trust-grid">
@@ -100,185 +142,315 @@ function trust({ settings, location }) {
       <b>${esc(String(r.value).replace('.', ','))}</b>
       <span class="trust-stars" aria-hidden="true">★★★★★</span>
       <small>${esc(r.sourceLabel)} · ${esc(String(r.reviewsCount))} отзыва · ${esc(String(r.ratingsCount))} оценки</small>
-      ${sourceTag('Смотреть отзывы', r.sourceUrl)}
+      ${sourceTag('Открыть отзывы', r.sourceUrl)}
     </div>
     <div class="trust-item">
       <b>${esc(String(r.photosCount))}</b>
-      <small>фото локации в ${esc(r.sourceLabel)} — мы используем их на сайте</small>
+      <small>фотографии локации в ${esc(r.sourceLabel)} — кадры на сайте оттуда</small>
     </div>
     <div class="trust-item">
       <b>${esc(settings.hours.shiftStart)}–${esc(settings.hours.shiftEnd)}</b>
-      <small>ежедневно, включая ночные сеансы</small>
+      <small>работаем ежедневно, включая ночные сеансы</small>
     </div>
     <div class="trust-item">
-      <b>60 мин</b>
+      <b>${esc(String(quest.durationMinutes))} мин</b>
       <small>длится сам квест, 2–3 часа — программы с кинорумом</small>
     </div>
   </div>
   <p class="trust-updated">
-    Данные ${esc(r.sourceLabel)} обновлены ${esc(r.updatedAt)}. Рейтинг живой — его обновляет владелец,
-    поэтому он не зашит в вёрстку.
+    Данные ${esc(r.sourceLabel)} обновлены ${esc(r.updatedAt)}. Рейтинг живой: его обновляет владелец,
+    поэтому он не зашит в вёрстку. Адрес: ${esc(location.fullAddress)}.
   </p>
 </section>`;
 }
 
-/* ── ПАКЕТЫ ─────────────────────────────────────────────────────────────── */
+/* ── БЛИЖАЙШИЕ ИГРЫ ─────────────────────────────────────────────────────── */
 
-function packagesSection({ settings, packages, compact = false }) {
-  const list = compact ? packages.filter((p) => p.confirmed).slice(0, 4) : packages;
-  return `<section class="section section--packages" id="packages">
+function slotsBoard({ days, quest, settings, limit = 6 }) {
+  const rows = [];
+  for (const day of days) {
+    for (const slot of day.slots) {
+      if (slot.status !== 'open') continue;
+      if (slot.startIso < new Date().toISOString()) continue;
+      rows.push({ day, slot });
+      if (rows.length >= limit) break;
+    }
+    if (rows.length >= limit) break;
+  }
+
+  return `<section class="section section--slots" id="slots">
   <div class="wrap">
     ${sectionHead({
-      eyebrow: 'Выбери свой кошмар',
-      title: 'Пакеты и цены',
-      lead:
-        'Квест можно взять отдельно с кинорумом или собрать полную программу: фильм, пицца, бургеры и видео с вашей игры. Цены — с прайс-листов FANTOM.'
+      eyebrow: 'Занятость сейчас',
+      title: 'Ближайшие игры',
+      lead: 'Свободное время по игровым дням. Ночные сеансы после полуночи помечены отдельно.'
     })}
-    <div class="packages">
-      ${list.map((item) => packageCard(item)).join('')}
+
+    ${
+      rows.length
+        ? `<ul class="slot-board">
+      ${rows
+        .map(
+          (row) => `<li class="slot-row">
+        <div class="slot-row-when">
+          <b>${esc(row.slot.time)}</b>
+          <span>${esc(row.day.label)}${row.slot.crossesMidnight ? ' · после полуночи' : ''}</span>
+        </div>
+        <div class="slot-row-quest">
+          <span>${esc(quest.name)}</span>
+          <small>${esc(settings.hours.label)}</small>
+        </div>
+        <a class="btn btn-blood" href="/booking?date=${esc(row.day.businessDate)}&time=${esc(row.slot.time)}">Забронировать</a>
+      </li>`
+        )
+        .join('')}
+    </ul>`
+        : `<div class="empty-state">
+        <b>Свободное время показывается в форме записи</b>
+        <p>Выберите сценарий и дату — свободные слоты появятся сразу.</p>
+        <a class="btn btn-blood" href="/booking">Перейти к записи</a>
+      </div>`
+    }
+  </div>
+</section>`;
+}
+
+/* ── КАТАЛОГ ────────────────────────────────────────────────────────────── */
+
+function catalog({ packages, settings, quest }) {
+  const confirmed = packages.filter((item) => item.confirmed);
+  const durations = [...new Set(confirmed.map((item) => item.durationLabel).filter(Boolean))];
+
+  return `<section class="section section--catalog" id="quests">
+  <div class="wrap">
+    ${sectionHead({
+      eyebrow: 'Каталог',
+      title: 'Выбери свой страх',
+      lead:
+        'Четыре программы: короткая с кинорумом, две полные с пиццей и бургерами и «Пакет Хоррор» с фильмом «Проклятия Монахини». ' +
+        'Цены — с прайс-листов локации.'
+    })}
+
+    ${
+      durations.length > 1
+        ? `<div class="chips" role="group" aria-label="Фильтр по длительности">
+      <button class="chip is-active" type="button" data-filter="all" aria-pressed="true">Все программы</button>
+      ${durations
+        .map(
+          (label) =>
+            `<button class="chip" type="button" data-filter="${esc(label)}" aria-pressed="false">${esc(label)}</button>`
+        )
+        .join('')}
+      <span class="chips-count" data-filter-count>Показано: ${confirmed.length} из ${confirmed.length}</span>
+    </div>`
+        : ''
+    }
+
+    <div class="catalog" data-catalog>
+      ${confirmed.map((item) => catalogCard(item)).join('')}
     </div>
-    <p class="section-note">
-      Цены перенесены с фотографий прайс-листов, которые владелец загрузил в 2ГИС.
-      ${sourceTag('Открыть прайс-листы в 2ГИС', settings.rating.sourceUrl.replace('/tab/reviews', '/tab/menu'))}
+
+    ${
+      packages.some((item) => !item.confirmed)
+        ? `<p class="section-note">
+      Ещё один пакет владелец пока не подтвердил — мы не публикуем его состав и цену.
+      Уточнить можно в WhatsApp: <a href="${esc(settings.whatsappUrl)}" rel="noopener">${esc(settings.phone)}</a>.
+    </p>`
+        : ''
+    }
+  </div>
+</section>`;
+}
+
+function catalogCard(item) {
+  return `<article class="quest-card" data-duration="${esc(item.durationLabel || '')}" id="${esc(item.id)}">
+  <a class="quest-card-media" href="#${esc(item.id)}" aria-label="${esc(item.name)}">
+    ${
+      item.priceListImage
+        ? `<img src="${esc(item.priceListImage)}" alt="${esc('Прайс-лист «' + item.name + '» в локации FANTOM')}" width="1000" height="1333" loading="lazy" decoding="async">`
+        : `<span class="quest-card-blank">Фото программы</span>`
+    }
+    <span class="quest-card-badge">${esc(item.durationLabel || 'программа')}</span>
+  </a>
+
+  <div class="quest-card-body">
+    <p class="quest-card-eyebrow">${esc(item.tagline)}</p>
+    <h3>${esc(item.name)}</h3>
+
+    <ul class="quest-card-meta">
+      <li>${icon('clock2')}<span>${esc(item.durationLabel || '—')}</span></li>
+      <li>${icon('mask')}<span>${esc(item.audienceLabel || '—')}</span></li>
+      <li>${icon('star')}<span>${esc(item.baseGuests ? item.baseGuests + ' человек включено' : '—')}</span></li>
+    </ul>
+
+    <ul class="quest-card-list">
+      ${item.includes.slice(0, 5).map((line) => `<li>${esc(line)}</li>`).join('')}
+    </ul>
+    ${item.includes.length > 5 ? `<p class="quest-card-more">и ещё ${item.includes.length - 5} пункта в программе</p>` : ''}
+
+    <p class="quest-card-price">
+      <b>${item.priceLabel ? esc(item.priceLabel) : pending('цена уточняется')}</b>
+      ${item.priceNote ? `<span>${esc(item.priceNote)}</span>` : ''}
+    </p>
+
+    <a class="btn btn-blood btn-block" href="/booking?package=${esc(item.id)}" data-cta="package">Выбрать время</a>
+  </div>
+</article>`;
+}
+
+/* ── ПЕРСОНАЖИ ──────────────────────────────────────────────────────────── */
+
+function characters({ quest }) {
+  return `<section class="section section--characters" id="characters">
+  <div class="wrap">
+    ${sectionHead({
+      eyebrow: 'Кто ждёт внутри',
+      title: 'Внутри ждут не декорации',
+      lead:
+        'Игру ведут живые актёры. В сценарии их трое — и каждый работает по выбранному вами уровню страха.'
+    })}
+
+    <div class="characters">
+      ${quest.characters
+        .map(
+          (character) => `<article class="character${character.image ? '' : ' character--noimage'}">
+        ${
+          character.image
+            ? `<div class="character-media">
+                <img src="${esc(character.image)}" alt="${esc(character.imageAlt)}" width="900" height="1600" loading="lazy" decoding="async">
+              </div>`
+            : `<div class="character-media character-media--empty"><span>Кадр персонажа</span></div>`
+        }
+        <div class="character-body">
+          <span class="character-role">${esc(character.role === 'контакт' ? 'работает в контакте' : 'по сюжету')}</span>
+          <h3>${esc(character.name)}</h3>
+          <p>${esc(character.note)}</p>
+        </div>
+      </article>`
+        )
+        .join('')}
+    </div>
+
+    <div class="characters-note">
+      <p>
+        Состав, грим и детали ролей меняются от игры к игре — так задумано.
+        Кадр третьего персонажа владелец ещё не передал, поэтому мы не подставляем чужое фото.
+      </p>
+      <p class="source-line">Подтверждено публикацией FANTOM: «В нашем квесте 3 персонажей — Самара, Монахиня и клоун Эдди».</p>
+    </div>
+  </div>
+</section>`;
+}
+
+/* ── УРОВЕНЬ СТРАХА ─────────────────────────────────────────────────────── */
+
+function fearScale({ quest }) {
+  const modes = quest.modes.list;
+  return `<section class="section section--fear" id="fear">
+  <div class="wrap">
+    ${sectionHead({
+      eyebrow: 'Уровень страха',
+      title: 'Насколько жутко — решаете вы',
+      lead:
+        'У локации пять режимов: два детских, два средних и хард. Режим выбирается при записи, ' +
+        'и администратор подтверждает его с командой до игры.'
+    })}
+
+    <ol class="fear-list" data-fear>
+      ${modes
+        .map(
+          (mode, index) => `<li class="fear-item${mode.id === 'hard' ? ' fear-item--hard' : ''}" data-fear-item="${esc(mode.id)}">
+        <span class="fear-num">${String(index + 1).padStart(2, '0')}</span>
+        <div class="fear-body">
+          <h3>${esc(mode.title)}</h3>
+          <p>${esc(fearNote(mode.id))}</p>
+        </div>
+        <span class="fear-mark" aria-hidden="true"></span>
+      </li>`
+        )
+        .join('')}
+    </ol>
+
+    <div class="fear-actions">
+      <a class="btn btn-blood btn-xl" href="/booking">Забронировать с нужным режимом</a>
+      <a class="btn btn-outline btn-xl" href="${esc(quest.modes.sourcePhoto)}" target="_blank" rel="noopener">Фото таблички режимов</a>
+    </div>
+
+    <p class="source-line">
+      Табличка «Режимы игры» в локации. Возрастные границы для средних режимов владелец ещё не подтвердил —
+      уточните у администратора до записи.
     </p>
   </div>
 </section>`;
 }
 
-function packageCard(item) {
-  const unconfirmed = !item.confirmed;
-  return `<article class="package${item.primary ? ' package--primary' : ''}${unconfirmed ? ' package--pending' : ''}">
-  <div class="package-top">
-    <span class="package-icon">${icon(item.icon)}</span>
-    <div>
-      <h3>${esc(item.name)}</h3>
-      <p class="package-tagline">${esc(item.tagline)}</p>
-    </div>
-  </div>
-
-  <p class="package-price">
-    ${
-      item.priceLabel
-        ? `<b>${esc(item.priceLabel)}</b>`
-        : pending('Цена уточняется', item.priceNote)
-    }
-    ${item.durationLabel ? `<span class="package-duration">${esc(item.durationLabel)}</span>` : ''}
-  </p>
-
-  ${
-    item.includes.length
-      ? `<ul class="package-list">${item.includes.map((line) => `<li>${esc(line)}</li>`).join('')}</ul>`
-      : `<ul class="package-list package-list--pending">
-          ${(item.unconfirmed || []).map((line) => `<li>${pending(line)}</li>`).join('')}
-        </ul>`
-  }
-
-  ${item.priceNote ? `<p class="package-note">${esc(item.priceNote)}</p>` : ''}
-  ${
-    item.priceListImage
-      ? `<a class="package-proof" href="${esc(item.priceListImage)}" target="_blank" rel="noopener">
-          <img src="${esc(item.priceListImage)}" alt="${esc('Прайс-лист «' + item.name + '»')}" width="1000" height="1333" loading="lazy" decoding="async">
-          <span>Фото прайс-листа</span>
-        </a>`
-      : ''
-  }
-  ${
-    item.confirmed
-      ? `<a class="btn btn-blood btn-block" href="/booking?package=${esc(item.id)}" data-cta="package">Забронировать «${esc(item.name.replace(/^Пакет\s*/i, ''))}»</a>`
-      : `<span class="btn btn-disabled btn-block" aria-disabled="true">Ждём данные от владельца</span>`
-  }
-</article>`;
+/** Пояснения к режимам: только то, что следует из названий на табличке. */
+function fearNote(id) {
+  if (id === 'kids-soft') return 'Без спецэффектов: атмосфера, декорации и сюжет. Подходит для первого знакомства с жанром.';
+  if (id === 'kids-fx') return 'Со спецэффектами: свет, звук и работа актёров, но без жёсткого контакта.';
+  if (id === 'mid-no-contact') return 'Актёры работают рядом, но не касаются игроков.';
+  if (id === 'mid-contact') return 'Средний контакт: актёры могут разделить команду и взаимодействовать ближе.';
+  if (id === 'hard') return 'Формат 18+ с полным контактом — для тех, кто уже был на хоррор-квестах.';
+  return 'Режим игры.';
 }
 
-/* ── КВЕСТ: персонажи и режимы ──────────────────────────────────────────── */
+/* ── ИСТОРИЯ ────────────────────────────────────────────────────────────── */
 
-function questSection({ quest, settings }) {
-  return `<section class="section section--quest" id="quest">
-  <div class="wrap">
-    ${sectionHead({
-      eyebrow: 'Локация',
-      title: quest.name,
-      lead: quest.shortDescription
-    })}
-
-    <div class="quest-layout">
-      <div class="quest-characters">
-        <h3 class="sub-title">Кого вы встретите</h3>
-        <ul class="character-list">
-          ${quest.characters
-            .map(
-              (character) => `<li>
-            <span class="character-mark" aria-hidden="true">${brandMark(22)}</span>
-            <b>${esc(character.name)}</b>
-            <span>${esc(character.note)}</span>
-          </li>`
-            )
-            .join('')}
-        </ul>
-        <p class="source-line">Подтверждено публикациями FANTOM: «В нашем квесте 3 персонажей».</p>
-      </div>
-
-      <div class="quest-modes">
-        <h3 class="sub-title">Режимы игры</h3>
-        <p class="sub-lead">Уровень страха выбираете вы — от детского до 18+.</p>
-        <ol class="mode-list">
-          ${quest.modes.list
-            .map(
-              (mode, index) => `<li class="mode${mode.id === 'hard' ? ' mode--hard' : ''}">
-            <span class="mode-num">${String(index + 1).padStart(2, '0')}</span>
-            <span class="mode-name">${esc(mode.title)}</span>
-          </li>`
-            )
-            .join('')}
-        </ol>
-        <p class="source-line">
-          Табличка «Режимы игры» в локации. ${sourceTag('Фото таблички', '/images/prices/rezhimy-igry.webp')}
-        </p>
-      </div>
-    </div>
-
-    <div class="quest-cta">
-      <a class="btn btn-blood btn-xl" href="/booking">Забронировать квест</a>
-      <a class="btn btn-outline btn-xl" href="/quests">Подробнее о локации</a>
-    </div>
-  </div>
-</section>`;
-}
-
-/* ── СЮЖЕТ ──────────────────────────────────────────────────────────────── */
-
-function storySection({ content }) {
+function story({ content, quest }) {
   const story = content.story;
+  const first = story.steps[0];
+  const rest = story.steps.slice(1);
+
   return `<section class="section section--story" id="story">
   <div class="wrap">
     ${sectionHead({ eyebrow: story.eyebrow, title: story.title })}
-    <ol class="story">
-      ${story.steps
-        .map(
-          (step, index) => `<li class="story-step" data-reveal>
-        <span class="story-num">${esc(step.num)}</span>
-        <div class="story-body">
-          <h3>${esc(step.title)}</h3>
-          <p>${esc(step.text)}</p>
-          ${step.source ? `<p class="source-line">${esc(step.source)}</p>` : ''}
-        </div>
-      </li>`
-        )
-        .join('')}
-    </ol>
+
+    <div class="story-layout">
+      <div class="story-lead">
+        <p class="story-lead-num">${esc(first.num)}</p>
+        <h3>${esc(first.title)}</h3>
+        <p>${esc(first.text)}</p>
+        ${first.source ? `<p class="source-line">${esc(first.source)}</p>` : ''}
+        <p class="story-lead-meta">
+          ${esc(quest.name)} · ${esc(String(quest.durationMinutes))} минут ·
+          ${esc(String(quest.characters.length))} персонажа
+        </p>
+      </div>
+
+      <ol class="story-steps">
+        ${rest
+          .map(
+            (step) => `<li class="story-step" data-reveal>
+          <span class="story-num">${esc(step.num)}</span>
+          <div>
+            <h3>${esc(step.title)}</h3>
+            <p>${esc(step.text)}</p>
+            ${step.source ? `<p class="source-line">${esc(step.source)}</p>` : ''}
+          </div>
+        </li>`
+          )
+          .join('')}
+      </ol>
+    </div>
+
+    <div class="story-actions">
+      <a class="btn btn-blood btn-xl" href="/booking">Забронировать квест</a>
+      <a class="btn btn-outline btn-xl" href="/quests">Все программы</a>
+    </div>
   </div>
 </section>`;
 }
 
-/* ── ЧТО ТЕБЯ ЖДЁТ ──────────────────────────────────────────────────────── */
+/* ── АТМОСФЕРА ──────────────────────────────────────────────────────────── */
 
-function featuresSection({ content }) {
+function features({ content }) {
   return `<section class="section section--features" id="features">
   <div class="wrap">
     ${sectionHead({
-      eyebrow: 'Что тебя ждёт',
-      title: 'Всё подтверждено источниками',
-      lead: 'Ни одного выдуманного пункта: каждая особенность взята с вывески, прайс-листа или публикации FANTOM.'
+      eyebrow: 'Что внутри',
+      title: 'Ты не просто решаешь загадки',
+      lead:
+        'Это не комната с замками. Каждый пункт ниже подтверждён источниками: вывеской, прайс-листом или публикацией FANTOM.'
     })}
     <div class="features">
       ${content.features
@@ -298,41 +470,44 @@ function featuresSection({ content }) {
 
 /* ── ГАЛЕРЕЯ ────────────────────────────────────────────────────────────── */
 
-function gallerySection({ gallery, settings, location, withViewer = true, limit = 0 }) {
+function gallery({ gallery, settings, location, withViewer = true, limit = 0 }) {
   const items = limit ? gallery.slice(0, limit) : gallery;
   return `<section class="section section--gallery" id="gallery">
   <div class="wrap">
     ${sectionHead({
-      eyebrow: 'Реальные кадры',
-      title: 'Как это выглядит внутри',
+      eyebrow: 'Изнутри',
+      title: 'Кадры, снятые внутри',
       lead:
-        'Фотографии локации, актёров и гостей из галереи FANTOM в 2ГИС. Ничего постановочного и никакого стока.'
+        'Фотографии локации, актёров и гостей из галереи FANTOM в 2ГИС. Нажмите на кадр — откроется на весь экран.'
     })}
   </div>
 
   <div class="gallery-strip" data-gallery>
     ${items
       .map(
-        (item, index) => `<figure class="gallery-item${item.wide ? ' gallery-item--wide' : ''}">
+        (item, index) => `<figure class="gallery-item" data-slot="${index % 7}">
       <button class="gallery-button" type="button" data-gallery-open="${index}"
               aria-label="Открыть фото: ${esc(item.caption)}">
         <img src="${esc(item.thumb)}" alt="${esc(item.alt)}" width="1000" height="1250"
              loading="lazy" decoding="async">
-        <span class="gallery-caption">
-          <b>${esc(item.caption)}</b>
-          <small>${esc(item.author)}</small>
-        </span>
       </button>
+      <figcaption class="gallery-caption">
+        <b>${esc(item.caption)}</b>
+        <small>${esc(item.author)}</small>
+      </figcaption>
     </figure>`
       )
       .join('')}
   </div>
 
   <div class="wrap gallery-foot">
-    <a class="btn btn-outline" href="/gallery">Вся галерея (${gallery.length + 5} кадров)</a>
-    <a class="btn btn-ghost" href="${esc(location ? location.galleryUrl : settings.rating.sourceUrl)}" rel="noopener" target="_blank">
-      Смотреть все ${esc(String(settings.rating.photosCount))} фото в 2ГИС
-    </a>
+    <p class="gallery-hint">Свайп или прокрутка — ещё ${Math.max(items.length - 3, 0)} кадров</p>
+    <div class="gallery-actions">
+      <a class="btn btn-outline" href="/gallery">Вся галерея</a>
+      <a class="btn btn-ghost" href="${esc(location ? location.galleryUrl : settings.rating.sourceUrl)}" rel="noopener" target="_blank">
+        Все ${esc(String(settings.rating.photosCount))} фото в ${esc(settings.rating.sourceLabel)}
+      </a>
+    </div>
   </div>
 
   ${
@@ -351,22 +526,101 @@ function gallerySection({ gallery, settings, location, withViewer = true, limit 
 </section>`;
 }
 
+/* ── INSTAGRAM ──────────────────────────────────────────────────────────── */
+
+function instagram({ settings, gallery }) {
+  const shots = gallery.slice(0, 4);
+  return `<section class="section section--instagram">
+  <div class="wrap instagram-layout">
+    <div class="instagram-copy">
+      ${sectionHead({
+        eyebrow: 'Instagram',
+        title: 'Больше FANTOM',
+        lead:
+          'Реальные кадры из локации, реакции команд и объявления о ночных играх — в аккаунте площадки.'
+      })}
+      <ul class="instagram-facts">
+        <li>${esc(settings.instagramHandle)} — основной аккаунт локации</li>
+        <li>${esc(settings.instagramGisHandle)} — аккаунт, на который ссылается карточка 2ГИС</li>
+        <li>Видео моменты с квеста входят в пакеты, Reels можно заказать отдельно</li>
+      </ul>
+      <a class="btn btn-blood btn-xl" href="${esc(settings.instagramUrl)}" rel="noopener" target="_blank" data-cta="instagram">
+        Открыть Instagram
+      </a>
+    </div>
+    <div class="instagram-grid">
+      ${shots
+        .map(
+          (item) => `<a class="instagram-shot" href="${esc(settings.instagramUrl)}" rel="noopener" target="_blank" aria-label="${esc(item.caption)}">
+        <img src="${esc(item.thumb)}" alt="${esc(item.alt)}" width="480" height="600" loading="lazy" decoding="async">
+      </a>`
+        )
+        .join('')}
+    </div>
+  </div>
+</section>`;
+}
+
+/* ── ПРОВЕРЯЕМЫЕ ЦИФРЫ ──────────────────────────────────────────────────── */
+
+function numbers({ settings, quest, packages, location }) {
+  const confirmedPackages = packages.filter((item) => item.confirmed).length;
+  const sources = settings.sources || [];
+  return `<section class="section section--numbers" id="numbers">
+  <div class="wrap">
+    ${sectionHead({
+      eyebrow: 'Проверяемые цифры',
+      title: 'Ни одной цифры «из головы»',
+      lead:
+        'Всё, что есть на этой странице, можно проверить по ссылкам ниже. Мы намеренно не показываем счётчики вроде «10 000 игроков» и не запускаем таймеры — страх должен быть в локации, а не в интерфейсе.'
+    })}
+
+    <ul class="numbers">
+      <li><b>${esc(String(settings.rating.reviewsCount))}</b><span>отзыва в ${esc(settings.rating.sourceLabel)}</span></li>
+      <li><b>${esc(String(settings.rating.photosCount))}</b><span>фото локации</span></li>
+      <li><b>${esc(String(quest.durationMinutes))}</b><span>минут длится квест</span></li>
+      <li><b>${esc(String(quest.characters.length))}</b><span>персонажа в сценарии</span></li>
+      <li><b>${esc(String(quest.modes.list.length))}</b><span>режима страха</span></li>
+      <li><b>${esc(String(confirmedPackages))}</b><span>программы с ценой</span></li>
+    </ul>
+
+    <div class="numbers-sources">
+      <p class="numbers-sources-title">Источники</p>
+      <ul>
+        ${sources
+          .map(
+            (source) =>
+              `<li><a href="${esc(source.url)}" rel="noopener" target="_blank">${esc(source.label)}</a><span>${esc(source.note || '')}</span></li>`
+          )
+          .join('')}
+      </ul>
+      <p class="source-line">
+        Локация: ${esc(location.fullAddress)}. Данные собраны ${esc(settings.rating.updatedAt)}.
+      </p>
+    </div>
+  </div>
+</section>`;
+}
+
 /* ── ОТЗЫВЫ ─────────────────────────────────────────────────────────────── */
 
-function reviewsSection({ settings, reviews, content, limit = 4 }) {
+function reviews({ settings, reviews, limit = 6 }) {
   const list = limit ? reviews.slice(0, limit) : reviews;
   const r = settings.rating;
   return `<section class="section section--reviews" id="reviews">
   <div class="wrap">
     ${sectionHead({
       eyebrow: 'Отзывы',
-      title: 'Что говорят гости',
-      lead: `Рейтинг ${String(r.value).replace('.', ',')} в ${r.sourceLabel} на основе ${r.ratingsCount} оценок и ${r.reviewsCount} отзывов.`
+      title: 'Что говорят после игры',
+      lead:
+        'Отзывы приведены дословно: имя, дата, оценка и текст — как в ' + r.sourceLabel +
+        '. Ответы организации тоже настоящие.'
     })}
 
     <div class="rating-row">
       <div class="rating-big">
         <b>${esc(String(r.value).replace('.', ','))}</b>
+        <span class="rating-scale">из 5</span>
         <span class="trust-stars" aria-hidden="true">★★★★★</span>
       </div>
       <ul class="rating-facts">
@@ -376,7 +630,7 @@ function reviewsSection({ settings, reviews, content, limit = 4 }) {
         <li><b>${esc(String(r.photosWithReviewsCount))}</b><span>отзыва с фото</span></li>
       </ul>
       <a class="btn btn-outline" href="${esc(r.sourceUrl)}" rel="noopener nofollow" target="_blank" data-cta="reviews">
-        Читать все отзывы в ${esc(r.sourceLabel)}
+        Смотреть все отзывы
       </a>
     </div>
 
@@ -384,20 +638,9 @@ function reviewsSection({ settings, reviews, content, limit = 4 }) {
       ${list.map((review) => reviewCard(review)).join('')}
     </div>
 
-    ${
-      content && content.reviewHighlights
-        ? `<ul class="review-highlights">
-      ${content.reviewHighlights
-        .map(
-          (item) => `<li><b>${esc(item.label)}</b><span>${esc(item.note)}</span></li>`
-        )
-        .join('')}
-    </ul>
     <p class="source-line">
-      Подборка составлена по прочитанным отзывам, а не по нашей оценке. Отзывы приведены дословно.
-    </p>`
-        : ''
-    }
+      Подборка составлена по прочитанным отзывам, а не по нашей оценке. Мы не публикуем отзывы без источника.
+    </p>
   </div>
 </section>`;
 }
@@ -411,10 +654,7 @@ function reviewCard(review) {
   <p class="review-text">${esc(review.text)}</p>
   ${
     review.answer
-      ? `<div class="review-answer">
-          <b>Ответ FANTOM</b>
-          <p>${esc(review.answer)}</p>
-        </div>`
+      ? `<div class="review-answer"><b>Ответ FANTOM</b><p>${esc(review.answer)}</p></div>`
       : ''
   }
   <footer class="review-foot">
@@ -431,24 +671,314 @@ function formatRuDate(iso) {
   return `${d} ${months[m - 1]} ${y}`;
 }
 
-/* ── КАК ПРОХОДИТ ───────────────────────────────────────────────────────── */
+/* ── КАК ЭТО ПРОИСХОДИТ ─────────────────────────────────────────────────── */
 
-function howSection({ content }) {
+function howItWorks({ content, quest, settings }) {
+  const steps = [
+    { num: '01', title: 'Выбираете программу', text: 'Просто квест с кинорумом или полная программа с фильмом, пиццей и бургерами.', time: '2 минуты' },
+    { num: '02', title: 'Выбираете дату и время', text: `Свободные слоты видны сразу. Работаем ${settings.hours.label.toLowerCase()} — есть ночные сеансы.`, time: '1 минута' },
+    { num: '03', title: 'Оставляете контакты', text: 'Имя и телефон. Регистрация не нужна, оплата на сайте не проводится.', time: '30 секунд' },
+    { num: '04', title: 'Приходите на Назарбаева, 50', text: 'Вход с улицы: белая кирпичная стена и чёрная вывеска QUEST ROOM FANTOM. Мы на цокольном этаже.', time: 'за 15 минут' },
+    { num: '05', title: 'Пытаетесь выйти', text: `${quest.durationMinutes} минут внутри сюжета: задания, актёры и выбранный вами режим страха.`, time: `${quest.durationMinutes} минут` }
+  ];
+
   return `<section class="section section--how" id="how">
   <div class="wrap">
-    ${sectionHead({ eyebrow: 'Как это работает', title: 'От заявки до темноты' })}
+    ${sectionHead({
+      eyebrow: 'Как это работает',
+      title: 'Пять шагов — и вы внутри',
+      lead: 'Ничего не нужно приносить, знать заранее или готовить.'
+    })}
     <ol class="how-list">
-      ${content.howItWorks
+      ${steps
         .map(
-          (step) => `<li class="how-step" data-reveal>
+          (step, index) => `<li class="how-step" data-reveal>
         <span class="how-num">${esc(step.num)}</span>
         <h3>${esc(step.title)}</h3>
         <p>${esc(step.text)}</p>
+        <span class="how-time">${esc(step.time)}</span>
+        ${index === steps.length - 1 ? '<span class="how-final" aria-hidden="true">дверь закрывается</span>' : ''}
       </li>`
         )
         .join('')}
     </ol>
+    <div class="how-actions">
+      <a class="btn btn-blood btn-xl" href="/booking">Забронировать</a>
+    </div>
   </div>
+</section>`;
+}
+
+/* ── ПЕРЕД ИГРОЙ ────────────────────────────────────────────────────────── */
+
+function beforeYouGo({ settings, location, quest }) {
+  const items = [
+    {
+      title: 'Режим и уровень страха',
+      text:
+        'Пять режимов: два детских, два средних и хард 18+. Выбираете при записи — администратор подтвердит его с командой до игры.'
+    },
+    {
+      title: 'Как найти вход',
+      text: location.entranceNote
+    },
+    {
+      title: 'График и ночные сеансы',
+      text: `Работаем ${settings.hours.label.toLowerCase()}. Сеансы после полуночи относятся к предыдущему игровому дню — администратор подскажет точное время.`
+    },
+    {
+      title: 'Оплата',
+      text: `На месте: ${settings.payments.methods.join(', ').toLowerCase()}. Сайт не принимает платежи и не запрашивает данные карты.`
+    },
+    {
+      title: 'Дети и взрослые',
+      text:
+        'Есть два детских режима — со спецэффектами и без. Для взрослых — средние режимы и хард 18+. Точные возрастные границы для средних режимов уточняйте у администратора.'
+    }
+  ];
+
+  return `<section class="section section--before" id="before">
+  <div class="wrap">
+    ${sectionHead({
+      eyebrow: 'Перед игрой',
+      title: 'Что нужно знать заранее',
+      lead: 'Пять пунктов без кликов — всё, о чём чаще всего спрашивают перед первой игрой.'
+    })}
+    <ul class="before-list">
+      ${items
+        .map(
+          (item) => `<li class="before-item" data-reveal>
+        <h3>${esc(item.title)}</h3>
+        <p>${esc(item.text)}</p>
+      </li>`
+        )
+        .join('')}
+      <li class="before-item before-item--ask">
+        <h3>Остались вопросы</h3>
+        <p>Стоп-слово, противопоказания, парковку и перенос брони подтвердит администратор — напишите или позвоните.</p>
+        <div class="before-actions">
+          <a class="btn btn-outline" href="${esc(settings.whatsappUrl)}" rel="noopener" data-cta="whatsapp">Написать в WhatsApp</a>
+          <a class="btn btn-ghost" href="tel:${esc(settings.phoneE164)}" data-cta="phone">${esc(settings.phone)}</a>
+        </div>
+      </li>
+    </ul>
+  </div>
+</section>`;
+}
+
+/* ── МАСТЕР ЗАПИСИ ──────────────────────────────────────────────────────── */
+
+/**
+ * Запись: шесть шагов вместо трёх — пакет, дата, время, гости, контакты,
+ * подтверждение. Все решения видны в сводке, сервер всё перепроверяет.
+ */
+function bookingWizard({ settings, packages, days, quest, initialPackage, initialDate, preselectedSlot }) {
+  const bookable = packages.filter((item) => item.confirmed);
+
+  return `<div class="booking-layout">
+  <form class="wizard" id="booking-form" novalidate
+        data-initial-package="${esc(initialPackage || '')}"
+        data-initial-date="${esc(initialDate || '')}"
+        data-initial-slot="${esc(preselectedSlot || '')}"
+        data-whatsapp="${esc(settings.whatsappUrl)}"
+        data-phone="${esc(settings.phone)}">
+
+    <ol class="wizard-progress" data-progress>
+      ${['Пакет', 'Дата', 'Время', 'Гости', 'Контакты', 'Проверка']
+        .map(
+          (label, index) =>
+            `<li class="${index === 0 ? 'is-active' : ''}" data-progress-step="${index + 1}"><span>${index + 1}</span>${esc(label)}</li>`
+        )
+        .join('')}
+    </ol>
+
+    <fieldset class="wizard-step is-active" data-step="1">
+      <legend class="wizard-legend">Шаг 1 из 6. Выберите программу</legend>
+      <div class="package-picker" role="radiogroup" aria-label="Программа">
+        ${bookable
+          .map(
+            (item) => `<button class="package-option" type="button" role="radio"
+              aria-checked="${item.id === initialPackage ? 'true' : 'false'}"
+              data-package="${esc(item.id)}"
+              data-package-name="${esc(item.name)}"
+              data-package-duration="${esc(item.durationLabel || '')}"
+              data-package-price="${esc(item.priceLabel || '')}">
+          <span class="package-option-name">${esc(item.name)}</span>
+          <span class="package-option-price">${item.priceLabel ? esc(item.priceLabel) : pending('уточняется')}</span>
+          <span class="package-option-meta">${esc(item.durationLabel || '')}${item.durationLabel && item.audienceLabel ? ' · ' : ''}${esc(item.audienceLabel || '')}</span>
+        </button>`
+          )
+          .join('')}
+      </div>
+      <input type="hidden" name="packageId" id="packageId" value="${esc(initialPackage || '')}">
+      <div class="wizard-nav">
+        <a class="btn btn-ghost" href="${esc(settings.whatsappUrl)}" rel="noopener">Не уверен — спросить</a>
+        <button class="btn btn-blood" type="button" data-next="2">Дальше: дата</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="wizard-step" data-step="2">
+      <legend class="wizard-legend">Шаг 2 из 6. Выберите дату</legend>
+      <div class="date-strip" data-date-strip role="radiogroup" aria-label="Игровой день">
+        ${days
+          .slice(0, 21)
+          .map(
+            (day, index) => `<button class="date-chip${day.businessDate === initialDate ? ' is-active' : ''}" type="button"
+          role="radio" aria-checked="${day.businessDate === initialDate ? 'true' : 'false'}"
+          data-date="${esc(day.businessDate)}" data-date-label="${esc(day.label)}">
+          <span class="date-chip-day">${esc(dayLabelShort(day, index))}</span>
+          <span class="date-chip-num">${esc(dayNumber(day))}</span>
+          <span class="date-chip-week">${esc(day.weekday)}</span>
+          <span class="date-chip-count">${day.availableCount ? day.availableCount + ' св.' : 'нет'}</span>
+        </button>`
+          )
+          .join('')}
+      </div>
+      <input type="hidden" name="date" id="date" value="${esc(initialDate || '')}">
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" type="button" data-back="1">Назад</button>
+        <button class="btn btn-blood" type="button" data-next="3" data-requires-date>Дальше: время</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="wizard-step" data-step="3">
+      <legend class="wizard-legend">Шаг 3 из 6. Выберите время</legend>
+      <p class="wizard-hint" data-slot-day></p>
+      <div class="slot-picker" role="radiogroup" aria-label="Свободное время" data-slot-picker>
+        <p class="slot-hint">Загружаем свободные слоты…</p>
+      </div>
+      <p class="field-hint" data-slot-status aria-live="polite"></p>
+      <input type="hidden" name="time" id="time" required>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" type="button" data-back="2">Назад</button>
+        <button class="btn btn-blood" type="button" data-next="4" data-requires-slot>Дальше: гости</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="wizard-step" data-step="4">
+      <legend class="wizard-legend">Шаг 4 из 6. Сколько вас будет</legend>
+      <div class="stepper" role="group" aria-label="Количество игроков">
+        <button class="stepper-btn" type="button" data-guests-minus aria-label="Меньше">−</button>
+        <span class="stepper-value" data-guests-value aria-live="polite">4</span>
+        <button class="stepper-btn" type="button" data-guests-plus aria-label="Больше">+</button>
+      </div>
+      <input type="hidden" name="guests" id="guests" value="4">
+      <p class="wizard-hint">
+        Точную доплату за дополнительных игроков подтвердит администратор: на прайс-листах указана доплата
+        за каждого следующего гостя.
+      </p>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" type="button" data-back="3">Назад</button>
+        <button class="btn btn-blood" type="button" data-next="5">Дальше: контакты</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="wizard-step" data-step="5">
+      <legend class="wizard-legend">Шаг 5 из 6. Контакты</legend>
+      <div class="field">
+        <label for="name">Имя</label>
+        <input id="name" name="name" type="text" autocomplete="name" maxlength="80" required aria-required="true" aria-describedby="name-hint">
+        <p class="field-hint" id="name-hint">Как к вам обращаться при подтверждении.</p>
+      </div>
+      <div class="field">
+        <label for="phone">Телефон</label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required
+               aria-required="true" placeholder="+7 700 000 00 00" aria-describedby="phone-hint">
+        <p class="field-hint" id="phone-hint">Формат Казахстана. Вставить номер можно — пробелы расставим сами.</p>
+      </div>
+      <div class="field">
+        <span class="field-label" id="messenger-label">Куда написать</span>
+        <div class="radio-row" role="radiogroup" aria-labelledby="messenger-label">
+          <label class="radio"><input type="radio" name="messenger" value="whatsapp" checked><span>WhatsApp</span></label>
+          <label class="radio"><input type="radio" name="messenger" value="telegram"><span>Telegram</span></label>
+          <label class="radio"><input type="radio" name="messenger" value="call"><span>Звонок</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="comment">Комментарий <span class="optional">необязательно</span></label>
+        <textarea id="comment" name="comment" rows="3" maxlength="600"
+                  placeholder="День рождения, нужен детский режим, во сколько удобно позвонить"></textarea>
+      </div>
+      <div class="field field--consent">
+        <label class="checkbox">
+          <input type="checkbox" id="consent" name="consent" required aria-required="true" aria-describedby="consent-hint">
+          <span>Согласен на обработку персональных данных по <a href="/privacy" target="_blank" rel="noopener">политике</a>.</span>
+        </label>
+        <p class="field-hint" id="consent-hint">Храним имя, телефон и комментарий. Больше ничего не запрашиваем.</p>
+      </div>
+      <div class="hp-field" aria-hidden="true">
+        <label for="website">Не заполняйте это поле</label>
+        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" type="button" data-back="4">Назад</button>
+        <button class="btn btn-blood" type="button" data-next="6" data-requires-contacts>Дальше: проверить</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="wizard-step" data-step="6">
+      <legend class="wizard-legend">Шаг 6 из 6. Проверьте и подтвердите</legend>
+      <dl class="confirm-list" data-confirm></dl>
+      <p class="wizard-error" data-form-error role="alert" aria-live="assertive" hidden></p>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" type="button" data-back="5">Назад</button>
+        <button class="btn btn-blood btn-xl" type="submit" data-submit>Забронировать</button>
+      </div>
+      <p class="wizard-hint">
+        Кнопка отправляет заявку, а не оплату: сайт не принимает платежи. Администратор подтвердит время.
+      </p>
+    </fieldset>
+  </form>
+
+  <aside class="wizard-summary" aria-live="polite">
+    <div class="summary-card">
+      <p class="summary-title">Ваша бронь</p>
+      <ul class="summary-list">
+        <li><span>Программа</span><b data-summary-package>—</b></li>
+        <li><span>Длительность</span><b data-summary-duration>—</b></li>
+        <li><span>Дата</span><b data-summary-date>—</b></li>
+        <li><span>Время</span><b data-summary-time>—</b></li>
+        <li><span>Гостей</span><b data-summary-guests>—</b></li>
+        <li><span>Цена</span><b data-summary-price class="pending-value">—</b></li>
+      </ul>
+      <p class="summary-note">
+        Адрес: ${esc(settings.brand.displayName)}, ${esc(settings.city)}. Оплата на месте:
+        ${esc(settings.payments.methods.join(', ').toLowerCase())}.
+      </p>
+    </div>
+  </aside>
+</div>`;
+}
+
+function dayLabelShort(day, index) {
+  if (index === 0) return 'Сегодня';
+  if (index === 1) return 'Завтра';
+  return day.weekday;
+}
+
+function dayNumber(day) {
+  return String(Number(day.businessDate.slice(-2)));
+}
+
+function bookingSuccess({ settings }) {
+  return `<section class="success" data-success hidden tabindex="-1" role="status">
+  <p class="success-kicker">Ты внутри</p>
+  <h2 class="success-title">Бронь принята</h2>
+  <ul class="summary-list">
+    <li><span>Номер</span><b data-success-ref>—</b></li>
+    <li><span>Программа</span><b data-success-package>—</b></li>
+    <li><span>Дата</span><b data-success-date>—</b></li>
+    <li><span>Время</span><b data-success-time>—</b></li>
+    <li><span>Гостей</span><b data-success-guests>—</b></li>
+  </ul>
+  <p class="success-note" data-success-note></p>
+  <div class="success-actions">
+    <a class="btn btn-blood" data-success-whatsapp href="${esc(settings.whatsappUrl)}" rel="noopener">Написать в WhatsApp</a>
+    <a class="btn btn-outline" href="tel:${esc(settings.phoneE164)}">${esc(settings.phone)}</a>
+  </div>
+  <p class="success-address">
+    ${esc(settings.city)}, вход с улицы: белая кирпичная стена и чёрная вывеска QUEST ROOM FANTOM.
+  </p>
 </section>`;
 }
 
@@ -458,26 +988,36 @@ function locationSection({ settings, location }) {
   return `<section class="section section--location" id="location">
   <div class="wrap location-grid">
     <div>
-      ${sectionHead({ eyebrow: 'Где мы', title: 'Подвал на Назарбаева, 50' })}
+      ${sectionHead({ eyebrow: 'Как добраться', title: 'Подвал на Назарбаева, 50' })}
       <ul class="location-list">
         <li><span>Адрес</span><b>${esc(location.fullAddress)}</b></li>
         <li><span>Этаж</span><b>${esc(location.floor)}</b></li>
+        <li><span>Как найти вход</span><b>${esc(location.entranceNote)}</b></li>
         <li><span>График</span><b>${esc(settings.hours.label)}</b></li>
         <li><span>Телефон</span><b><a href="tel:${esc(settings.phoneE164)}" data-cta="phone">${esc(settings.phone)}</a></b></li>
         <li><span>Instagram</span><b><a href="${esc(settings.instagramUrl)}" rel="noopener" data-cta="instagram">${esc(settings.instagramHandle)}</a></b></li>
-        <li><span>Оплата</span><b>${settings.payments.methods.map((m) => esc(m)).join(', ')}</b></li>
+        <li><span>Оплата</span><b>${settings.payments.methods.map((method) => esc(method)).join(', ')}</b></li>
       </ul>
-      <p class="location-entrance">${esc(location.entranceNote)}</p>
       <div class="location-actions">
         <a class="btn btn-blood" href="${esc(location.routeUrl)}" rel="noopener" data-cta="route">Построить маршрут</a>
-        <a class="btn btn-outline" href="/contacts">Контакты и вход</a>
+        <a class="btn btn-outline" href="/contacts">Контакты</a>
       </div>
     </div>
-    <a class="location-photo" href="${esc(location.galleryUrl)}" rel="noopener" target="_blank">
-      <img src="/images/gallery/entrance-street-1000.webp" alt="Вход в локацию FANTOM: белая кирпичная стена с чёрной вывеской QUEST ROOM FANTOM"
-           width="1000" height="750" loading="lazy" decoding="async">
-      <span>Вход с улицы. Ещё фото — в 2ГИС</span>
-    </a>
+    <div class="location-media">
+      <a class="location-photo" href="${esc(location.galleryUrl)}" rel="noopener" target="_blank">
+        <img src="/images/gallery/entrance-street-1000.webp" alt="Вход в локацию FANTOM: белая кирпичная стена с чёрной вывеской QUEST ROOM FANTOM"
+             width="1000" height="750" loading="lazy" decoding="async">
+        <span>Вход с улицы</span>
+      </a>
+      <div class="location-plan" aria-hidden="true">
+        <span class="location-plan-step">Здание</span>
+        <span class="location-plan-arrow">→</span>
+        <span class="location-plan-step">Чёрная вывеска</span>
+        <span class="location-plan-arrow">→</span>
+        <span class="location-plan-step">Спуск в цоколь</span>
+      </div>
+      <p class="source-line">Координаты: ${esc(String(location.lat))}, ${esc(String(location.lng))} · фото входа из отзывов ${esc(settings.rating.sourceLabel)}</p>
+    </div>
   </div>
 </section>`;
 }
@@ -488,29 +1028,30 @@ function faqItem(item, index) {
   const published = item.status === 'published' && item.answer;
   return `<details class="faq"${index === 0 ? ' open' : ''}>
   <summary>
+    <span class="faq-index">${String(index + 1).padStart(2, '0')}</span>
     <span class="faq-question">${esc(item.question)}</span>
-    ${published ? '' : pending('Нужно подтвердить')}
+    ${published ? '' : pending('Уточняется', 'Ответ появится после подтверждения владельцем')}
   </summary>
   <div class="faq-answer">
     ${
       published
         ? `<p>${esc(item.answer)}</p>`
-        : `<p class="faq-pending">${esc(item.placeholder || 'Ответ появится после подтверждения владельцем.')}</p>`
+        : `<p class="faq-pending">Уточните у администратора: <a href="#booking">форма записи</a> или WhatsApp.</p>`
     }
   </div>
 </details>`;
 }
 
-function faqSection({ faq, limit = 0, title = 'Частые вопросы' }) {
-  const published = faq.filter((item) => item.status === 'published');
-  const pendingItems = faq.filter((item) => item.status !== 'published');
-  const list = limit ? [...published, ...pendingItems].slice(0, limit) : [...published, ...pendingItems];
+function faq({ faq: items, limit = 0, title = 'Отвечаем прямо', lead }) {
+  const published = items.filter((item) => item.status === 'published');
+  const others = items.filter((item) => item.status !== 'published');
+  const list = limit ? [...published, ...others].slice(0, limit) : [...published, ...others];
   return `<section class="section section--faq" id="faq">
   <div class="wrap">
     ${sectionHead({
-      eyebrow: 'FAQ',
+      eyebrow: 'Вопросы',
       title,
-      lead: 'Сначала то, что известно точно. Ниже — вопросы, по которым ответ нужен от владельца: мы помечаем их, а не додумываем.'
+      lead: lead || 'Собрали то, что чаще всего спрашивают перед первой игрой. Ответы, которых у нас нет, мы не придумываем — их подтвердит владелец.'
     })}
     <div class="faq-list">${list.map((item, index) => faqItem(item, index)).join('')}</div>
   </div>
@@ -519,7 +1060,7 @@ function faqSection({ faq, limit = 0, title = 'Частые вопросы' }) {
 
 /* ── ФИНАЛЬНЫЙ CTA ──────────────────────────────────────────────────────── */
 
-function finalCtaSection({ settings, content, location }) {
+function finalCta({ settings, content, location }) {
   const cta = content.finalCta;
   return `<section class="final" id="final">
   <div class="final-bg" aria-hidden="true">
@@ -534,190 +1075,8 @@ function finalCtaSection({ settings, content, location }) {
       <a class="btn btn-blood btn-xl" href="/booking" data-cta="final">Забронировать квест</a>
       <a class="btn btn-outline btn-xl" href="tel:${esc(settings.phoneE164)}" data-cta="phone">${esc(settings.phone)}</a>
     </div>
-    <p class="final-note">${esc(cta.note)}</p>
+    <p class="final-note">Заявка бесплатная. Администратор подтвердит время в WhatsApp — и всё.</p>
     <p class="final-address">${esc(location.fullAddress)} · ${esc(settings.hours.label)}</p>
-  </div>
-</section>`;
-}
-
-/* ── МАСТЕР ЗАПИСИ ──────────────────────────────────────────────────────── */
-
-/**
- * Форма записи. Три шага: пакет → дата и время → контакты.
- * Все данные проверяются на сервере; здесь только UX.
- */
-function bookingWizard({ settings, packages, days, initialPackage, initialDate, preselectedSlot }) {
-  const bookable = packages.filter((p) => p.confirmed);
-  const total = days.length;
-
-  return `<div class="booking-layout">
-  <form class="wizard" id="booking-form" novalidate
-        data-initial-package="${esc(initialPackage || '')}"
-        data-initial-date="${esc(initialDate || '')}"
-        data-initial-slot="${esc(preselectedSlot || '')}"
-        data-whatsapp="${esc(settings.whatsappUrl)}"
-        data-phone="${esc(settings.phone)}">
-
-    <ol class="wizard-progress" data-progress>
-      <li class="is-active" data-progress-step="1"><span>1</span> Пакет</li>
-      <li data-progress-step="2"><span>2</span> Дата и время</li>
-      <li data-progress-step="3"><span>3</span> Контакты</li>
-    </ol>
-
-    <fieldset class="wizard-step is-active" data-step="1">
-      <legend class="wizard-legend">Шаг 1 из 3. Выберите пакет</legend>
-      <div class="package-picker" role="radiogroup" aria-label="Пакет">
-        ${bookable
-          .map(
-            (item) => `<button class="package-option" type="button" role="radio" aria-checked="${item.id === initialPackage ? 'true' : 'false'}"
-              data-package="${esc(item.id)}"
-              data-package-name="${esc(item.name)}"
-              data-package-duration="${esc(item.durationLabel || '')}">
-          <span class="package-option-name">${esc(item.name)}</span>
-          <span class="package-option-price">${item.priceLabel ? esc(item.priceLabel) : pending('цена уточняется')}</span>
-          <span class="package-option-meta">${esc(item.durationLabel || '')}${item.durationLabel && item.audienceLabel ? ' · ' : ''}${esc(item.audienceLabel || '')}</span>
-        </button>`
-          )
-          .join('')}
-      </div>
-      <input type="hidden" name="packageId" id="packageId" value="${esc(initialPackage || '')}">
-      <p class="wizard-hint" data-step1-hint>Пакет со звёздочкой — рекомендуемый: в нём и квест, и фильм.</p>
-      <div class="wizard-nav">
-        <a class="btn btn-ghost" href="${esc(settings.whatsappUrl)}" rel="noopener">Не уверен — спросить</a>
-        <button class="btn btn-blood" type="button" data-next="2">Дальше: дата и время</button>
-      </div>
-    </fieldset>
-
-    <fieldset class="wizard-step" data-step="2">
-      <legend class="wizard-legend">Шаг 2 из 3. Дата и время</legend>
-
-      <div class="field">
-        <label for="date">Игровой день</label>
-        <select id="date" name="date" required aria-required="true" data-date-select>
-          ${days
-            .map(
-              (day) =>
-                `<option value="${esc(day.businessDate)}"${day.businessDate === initialDate ? ' selected' : ''}>${esc(
-                  day.label
-                )}${day.availableCount ? ` — свободно ${day.availableCount}` : ' — нет свободного времени'}</option>`
-            )
-            .join('')}
-        </select>
-        <p class="field-hint">График ${esc(settings.hours.label)}. Ночные сеансы после 00:00 помечены «после полуночи» и относятся к выбранному игровому дню.</p>
-      </div>
-
-      <div class="field">
-        <span class="field-label" id="slots-label">Свободное время</span>
-        <div class="slot-picker" role="radiogroup" aria-labelledby="slots-label" data-slot-picker>
-          <p class="slot-hint">Загружаем свободные слоты…</p>
-        </div>
-        <p class="field-hint" data-slot-status aria-live="polite"></p>
-      </div>
-      <input type="hidden" name="time" id="time" required>
-
-      <div class="wizard-nav">
-        <button class="btn btn-ghost" type="button" data-back="1">Назад</button>
-        <button class="btn btn-blood" type="button" data-next="3" data-requires-slot>Дальше: контакты</button>
-      </div>
-    </fieldset>
-
-    <fieldset class="wizard-step" data-step="3">
-      <legend class="wizard-legend">Шаг 3 из 3. Контакты</legend>
-
-      <div class="field">
-        <label for="guests">Сколько вас будет</label>
-        <input id="guests" name="guests" type="number" inputmode="numeric" min="1" max="30" step="1" value="4" required
-               aria-required="true" aria-describedby="guests-hint">
-        <p class="field-hint" id="guests-hint">Точную доплату за дополнительных игроков подтвердит администратор.</p>
-      </div>
-
-      <div class="field">
-        <label for="name">Имя</label>
-        <input id="name" name="name" type="text" autocomplete="name" maxlength="80" required aria-required="true" aria-describedby="name-hint">
-        <p class="field-hint" id="name-hint">Как к вам обращаться при подтверждении.</p>
-      </div>
-
-      <div class="field">
-        <label for="phone">Телефон</label>
-        <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required
-               aria-required="true" placeholder="+7 700 000 00 00" aria-describedby="phone-hint">
-        <p class="field-hint" id="phone-hint">Формат Казахстана: +7 XXX XXX XX XX. Вставить номер из буфера можно — мы сами расставим пробелы.</p>
-      </div>
-
-      <div class="field">
-        <span class="field-label" id="messenger-label">Куда написать</span>
-        <div class="radio-row" role="radiogroup" aria-labelledby="messenger-label">
-          <label class="radio"><input type="radio" name="messenger" value="whatsapp" checked><span>WhatsApp</span></label>
-          <label class="radio"><input type="radio" name="messenger" value="telegram"><span>Telegram</span></label>
-          <label class="radio"><input type="radio" name="messenger" value="call"><span>Звонок</span></label>
-        </div>
-      </div>
-
-      <div class="field">
-        <label for="comment">Комментарий <span class="optional">необязательно</span></label>
-        <textarea id="comment" name="comment" rows="3" maxlength="600"
-                  placeholder="День рождения, нужен детский режим, во сколько удобно позвонить"></textarea>
-      </div>
-
-      <div class="field field--consent">
-        <label class="checkbox">
-          <input type="checkbox" id="consent" name="consent" required aria-required="true" aria-describedby="consent-hint">
-          <span>Согласен на обработку персональных данных по <a href="/privacy" target="_blank" rel="noopener">политике</a>.</span>
-        </label>
-        <p class="field-hint" id="consent-hint">Храним имя, телефон и комментарий. Больше ничего не запрашиваем.</p>
-      </div>
-
-      <div class="hp-field" aria-hidden="true">
-        <label for="website">Не заполняйте это поле</label>
-        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
-      </div>
-
-      <p class="wizard-error" data-form-error role="alert" aria-live="assertive" hidden></p>
-
-      <div class="wizard-nav">
-        <button class="btn btn-ghost" type="button" data-back="2">Назад</button>
-        <button class="btn btn-blood btn-xl" type="submit" data-submit>Забронировать</button>
-      </div>
-      <p class="wizard-hint">
-        Кнопка отправляет заявку, а не оплату: сайт не принимает платежи.
-      </p>
-    </fieldset>
-  </form>
-
-  <aside class="wizard-summary" aria-live="polite">
-    <div class="summary-card">
-      <p class="summary-title">Ваша заявка</p>
-      <ul class="summary-list">
-        <li><span>Пакет</span><b data-summary-package>—</b></li>
-        <li><span>Длительность</span><b data-summary-duration>—</b></li>
-        <li><span>Дата</span><b data-summary-date>—</b></li>
-        <li><span>Время</span><b data-summary-time>—</b></li>
-        <li><span>Игроков</span><b data-summary-guests>—</b></li>
-        <li><span>Цена</span><b data-summary-price class="pending-value">уточнит администратор</b></li>
-      </ul>
-      <p class="summary-note">Оплата на месте: наличные, перевод с карты или QR-код.</p>
-    </div>
-  </aside>
-</div>`;
-}
-
-function bookingSuccess({ settings }) {
-  return `<section class="success" data-success hidden tabindex="-1" role="status">
-  <p class="eyebrow">Заявка принята</p>
-  <h2 class="success-title">Мы получили вашу заявку</h2>
-  <ul class="summary-list">
-    <li><span>Номер заявки</span><b data-success-ref>—</b></li>
-    <li><span>Пакет</span><b data-success-package>—</b></li>
-    <li><span>Дата</span><b data-success-date>—</b></li>
-    <li><span>Время</span><b data-success-time>—</b></li>
-    <li><span>Игроков</span><b data-success-guests>—</b></li>
-    <li><span>Цена</span><b class="pending-value">уточнит администратор</b></li>
-  </ul>
-  <p class="success-note" data-success-note></p>
-  <div class="success-actions">
-    <a class="btn btn-blood" data-success-whatsapp href="${esc(settings.whatsappUrl)}" rel="noopener">Написать в WhatsApp</a>
-    <a class="btn btn-outline" href="tel:${esc(settings.phoneE164)}">${esc(settings.phone)}</a>
-    <a class="btn btn-ghost" href="/booking/status">Проверить статус</a>
   </div>
 </section>`;
 }
@@ -729,21 +1088,27 @@ module.exports = {
   sourceTag,
   icon,
   hero,
+  marquee,
   trust,
-  packagesSection,
-  packageCard,
-  questSection,
-  storySection,
-  featuresSection,
-  gallerySection,
-  reviewsSection,
+  slotsBoard,
+  catalog,
+  catalogCard,
+  characters,
+  fearScale,
+  story,
+  features,
+  gallery,
+  instagram,
+  numbers,
+  reviews,
   reviewCard,
-  howSection,
-  locationSection,
-  faqSection,
-  faqItem,
-  finalCtaSection,
+  howItWorks,
+  beforeYouGo,
   bookingWizard,
   bookingSuccess,
+  locationSection,
+  faq,
+  faqItem,
+  finalCta,
   formatRuDate
 };

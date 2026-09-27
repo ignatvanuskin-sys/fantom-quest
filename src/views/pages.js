@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const config = require('../config');
 const { page } = require('./layout');
@@ -16,41 +16,54 @@ function crumbs(items) {
     .join('<span class="crumbs-sep" aria-hidden="true">/</span>')}</div></nav>`;
 }
 
+function bookingBlock(data, options = {}) {
+  return `<section class="section section--booking" id="booking">
+  <div class="wrap">
+    ${s.sectionHead({
+      eyebrow: 'Бронирование',
+      title: options.title || 'Выбери дату',
+      lead:
+        options.lead ||
+        'Шесть шагов: программа, дата, время, гости, контакты, проверка. Заявка бесплатная — оплата на месте.'
+    })}
+    ${s.bookingWizard({
+      settings: data.settings,
+      packages: data.packages,
+      days: data.bookableDays,
+      quest: data.quest,
+      initialPackage: data.initialPackage || '',
+      initialDate: data.initialDate || '',
+      preselectedSlot: data.preselectedSlot || ''
+    })}
+    ${s.bookingSuccess({ settings: data.settings })}
+  </div>
+</section>`;
+}
+
 /* ── Главная ────────────────────────────────────────────────────────────── */
 
 function home(data) {
-  const { settings, location, quest, packages, gallery, reviews, faq, content, days } = data;
+  const { settings, location, quest, packages, gallery, reviews, faq, content, days, bookableDays } = data;
   const body = `
     ${s.hero({ settings, location, quest, packages })}
-    ${s.trust({ settings, location })}
-    ${s.packagesSection({ settings, packages })}
-    ${s.questSection({ quest, settings })}
-    ${s.storySection({ content })}
-    ${s.featuresSection({ content })}
-    ${s.gallerySection({ gallery, settings, location, limit: 12 })}
-    ${s.reviewsSection({ settings, reviews, content, limit: 4 })}
-    ${s.howSection({ content })}
-    <section class="section section--booking" id="booking">
-      <div class="wrap">
-        ${s.sectionHead({
-          eyebrow: 'Запись',
-          title: 'Забронировать квест',
-          lead: 'Три шага: пакет, дата и время, контакты. Заявка бесплатная — оплата на месте.'
-        })}
-        ${s.bookingWizard({
-          settings,
-          packages,
-          days,
-          initialPackage: '',
-          initialDate: '',
-          preselectedSlot: ''
-        })}
-        ${s.bookingSuccess({ settings })}
-      </div>
-    </section>
+    ${s.marquee({ settings, quest })}
+    ${s.trust({ settings, location, quest })}
+    ${s.slotsBoard({ days: bookableDays, quest, settings })}
+    ${s.catalog({ packages, settings, quest })}
+    ${s.characters({ quest })}
+    ${s.fearScale({ quest })}
+    ${s.story({ content, quest })}
+    ${s.features({ content })}
+    ${s.gallery({ gallery, settings, location, limit: 14 })}
+    ${s.instagram({ settings, gallery })}
+    ${s.numbers({ settings, quest, packages, location })}
+    ${s.reviews({ settings, reviews, limit: 6 })}
+    ${s.howItWorks({ content, quest, settings })}
+    ${s.beforeYouGo({ settings, location, quest })}
+    ${bookingBlock({ ...data, bookableDays })}
     ${s.locationSection({ settings, location })}
-    ${s.faqSection({ faq, limit: 6 })}
-    ${s.finalCtaSection({ settings, content, location })}
+    ${s.faq({ faq, limit: 8 })}
+    ${s.finalCta({ settings, content, location })}
   `;
 
   return page({
@@ -75,9 +88,11 @@ function home(data) {
 /* ── Квест ──────────────────────────────────────────────────────────────── */
 
 function questPage(data) {
-  const { settings, location, quest, packages, gallery, days } = data;
+  const { settings, location, quest, packages, reviews, faq, content, days } = data;
+  const features = quest.modes.list;
+
   const body = `
-    ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Квест', path: '/quests' }])}
+    ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Квесты', path: '/quests' }])}
 
     <section class="section quest-hero">
       <div class="wrap quest-hero-grid">
@@ -88,7 +103,7 @@ function questPage(data) {
           <dl class="hero-facts">
             <div><dt>Длительность</dt><dd>${esc(String(quest.durationMinutes))} минут</dd></div>
             <div><dt>Персонажи</dt><dd>${esc(String(quest.characters.length))}</dd></div>
-            <div><dt>Режимы</dt><dd>${esc(String(quest.modes.list.length))} уровня страха</dd></div>
+            <div><dt>Режимы</dt><dd>${esc(String(features.length))} уровня страха</dd></div>
             <div><dt>Состав</dt><dd>от 2 человек</dd></div>
           </dl>
           <div class="hero-actions">
@@ -99,55 +114,27 @@ function questPage(data) {
         <figure class="quest-hero-photo">
           <img src="/images/quests/nun-face-1440.webp" alt="Актриса в образе Монахини на локации FANTOM"
                width="1440" height="2560" fetchpriority="high" decoding="async">
+          <figcaption>Кадр из галереи локации</figcaption>
         </figure>
       </div>
     </section>
 
-    ${s.questSection({ quest, settings })}
-    ${s.storySection({ content: data.content })}
-    ${s.gallerySection({ gallery, settings, location, limit: 0 })}
-
-    <section class="section section--slots" id="slots">
-      <div class="wrap">
-        ${s.sectionHead({
-          eyebrow: 'Свободное время',
-          title: 'Ближайшие игровые дни',
-          lead: `График ${settings.hours.label}. Слоты после полуночи относятся к предыдущему игровому дню.`
-        })}
-        <div class="days">
-          ${days
-            .slice(0, 7)
-            .map(
-              (day) => `<article class="day">
-            <header><h3>${esc(day.label)}</h3><span>${day.availableCount ? `свободно ${day.availableCount}` : 'нет мест'}</span></header>
-            <ul class="day-slots">
-              ${day.slots
-                .filter((slot) => slot.status === 'open' || slot.status === 'held')
-                .slice(0, 8)
-                .map(
-                  (slot) =>
-                    `<li class="day-slot">${esc(slot.time)}${slot.crossesMidnight ? '<i>+1д</i>' : ''}</li>`
-                )
-                .join('') || '<li class="day-slot day-slot--empty">мест нет</li>'}
-            </ul>
-            ${
-              day.availableCount
-                ? `<a class="btn btn-outline btn-block" href="/booking?date=${esc(day.businessDate)}">Выбрать</a>`
-                : '<span class="btn btn-disabled btn-block" aria-disabled="true">Нет мест</span>'
-            }
-          </article>`
-            )
-            .join('')}
-        </div>
-      </div>
-    </section>
-
-    ${s.packagesSection({ settings, packages })}
-    ${s.finalCtaSection({ settings, content: data.content, location })}
+    ${s.story({ content, quest })}
+    ${s.characters({ quest })}
+    ${s.fearScale({ quest })}
+    ${s.gallery({ gallery: data.gallery, settings, location })}
+    ${s.slotsBoard({ days, quest, settings, limit: 4 })}
+    ${s.catalog({ packages, settings, quest })}
+    ${bookingBlock(data, {
+      title: 'Забронировать эту локацию',
+      lead: 'Выберите программу, дату и время. Заявка бесплатная — администратор подтвердит бронь.'
+    })}
+    ${s.faq({ faq, limit: 6 })}
+    ${s.finalCta({ settings, content, location })}
   `;
 
   return page({
-    title: `Хоррор-квест «${quest.name}» в Усть-Каменогорске — 60 минут, от 17 500 ₸`,
+    title: `Хоррор-квест «${quest.name}» в Усть-Каменогорске — 60 минут`,
     description: `${quest.shortDescription} Три персонажа, пять режимов страха. ${location.fullAddress}. Бронирование онлайн.`,
     path: '/quests',
     body,
@@ -156,7 +143,7 @@ function questPage(data) {
     ogType: 'article',
     ogImage: `${config.siteUrl}/images/quests/nun-face-1440.webp`,
     jsonLd: [
-      jsonld.breadcrumbs([{ name: 'Главная', path: '/' }, { name: 'Квест', path: '/quests' }]),
+      jsonld.breadcrumbs([{ name: 'Главная', path: '/' }, { name: 'Квесты', path: '/quests' }]),
       jsonld.service(settings, location),
       jsonld.offerCatalog(packages)
     ]
@@ -166,22 +153,10 @@ function questPage(data) {
 /* ── Пакеты и цены ──────────────────────────────────────────────────────── */
 
 function pricesPage(data) {
-  const { settings, location, packages, pricePhotos, addons } = data;
+  const { settings, location, packages, pricePhotos, addons, quest } = data;
   const body = `
-    ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Пакеты', path: '/prices' }])}
-    <section class="section">
-      <div class="wrap">
-        ${s.sectionHead({
-          eyebrow: 'Цены',
-          title: 'Пакеты FANTOM',
-          lead:
-            'Четыре программы: короткая с кинорумом, полная с пиццей и бургерами и флагманский «Пакет Хоррор» с фильмом «Проклятия Монахини».'
-        })}
-        <div class="packages packages--full">
-          ${packages.map((item) => s.packageCard(item)).join('')}
-        </div>
-      </div>
-    </section>
+    ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Программы', path: '/prices' }])}
+    ${s.catalog({ packages, settings, quest })}
 
     <section class="section section--alt">
       <div class="wrap">
@@ -204,12 +179,12 @@ function pricesPage(data) {
       </div>
     </section>
 
-    <section class="section">
+    <section class="section section--alt">
       <div class="wrap">
         ${s.sectionHead({
           eyebrow: 'Первоисточники',
           title: 'Прайс-листы как есть',
-          lead: 'Фотографии прайсов, которые владелец загрузил в 2ГИС. Мы перенесли цены с них без изменений.'
+          lead: 'Фотографии прайсов, которые владелец загрузил в 2ГИС. Цены перенесены с них без изменений.'
         })}
         <div class="price-photos">
           ${pricePhotos
@@ -226,16 +201,10 @@ function pricesPage(data) {
       </div>
     </section>
 
-    <section class="section section--booking">
-      <div class="wrap">
-        ${s.sectionHead({ eyebrow: 'Запись', title: 'Выбрать пакет и время' })}
-        ${s.bookingWizard({ settings, packages, days: data.days, initialPackage: '', initialDate: '', preselectedSlot: '' })}
-        ${s.bookingSuccess({ settings })}
-      </div>
-    </section>
+    ${bookingBlock(data)}
   `;
   return page({
-    title: 'Пакеты и цены хоррор-квеста FANTOM — Усть-Каменогорск',
+    title: 'Программы и цены хоррор-квеста FANTOM — Усть-Каменогорск',
     description:
       'Пакет Хоррор — 17 500 ₸ за двоих, Level mini — 30 000 ₸, Level 1 — 36 500 ₸, Level 2 — 50 000 ₸. ' +
       'Реальные цены с прайс-листов FANTOM в Усть-Каменогорске.',
@@ -244,7 +213,7 @@ function pricesPage(data) {
     settings,
     location,
     jsonLd: [
-      jsonld.breadcrumbs([{ name: 'Главная', path: '/' }, { name: 'Пакеты', path: '/prices' }]),
+      jsonld.breadcrumbs([{ name: 'Главная', path: '/' }, { name: 'Программы', path: '/prices' }]),
       jsonld.offerCatalog(packages)
     ]
   });
@@ -256,13 +225,13 @@ function galleryPage(data) {
   const { settings, location, gallery, pricePhotos } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Галерея', path: '/gallery' }])}
-    ${s.gallerySection({ gallery, settings, location })}
+    ${s.gallery({ gallery, settings, location })}
     <section class="section section--alt">
       <div class="wrap">
         ${s.sectionHead({
           eyebrow: 'Документы',
           title: 'Прайс-листы и таблички',
-          lead: 'Реальные таблички из локации: режимы игры, пакеты и стоимость видео.'
+          lead: 'Реальные таблички из локации: режимы игры, программы и стоимость видео.'
         })}
         <div class="price-photos">
           ${pricePhotos
@@ -278,7 +247,8 @@ function galleryPage(data) {
         </div>
       </div>
     </section>
-    ${s.finalCtaSection({ settings, content: data.content, location })}
+    ${s.instagram({ settings, gallery })}
+    ${s.finalCta({ settings, content: data.content, location })}
   `;
   return page({
     title: 'Фото хоррор-квеста FANTOM — локация, актёры, вывеска',
@@ -298,19 +268,19 @@ function reviewsPage(data) {
   const { settings, location, reviews, content } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Отзывы', path: '/reviews' }])}
-    ${s.reviewsSection({ settings, reviews, content, limit: 0 })}
+    ${s.reviews({ settings, reviews, limit: 0 })}
     <section class="section section--alt">
       <div class="wrap">
         ${s.sectionHead({ eyebrow: 'Прозрачность', title: 'Как мы работаем с отзывами' })}
         <ul class="plain-list">
           <li>Отзывы приведены дословно: текст, имя, дата и оценка — как в 2ГИС.</li>
           <li>Ответы организации тоже настоящие — их писал администратор FANTOM.</li>
-          <li>Schema.org Review добавляется только к подтверждённым отзывам с источником.</li>
-          <li>Рейтинг и количество отзывов — живые данные 2ГИС, их обновляет владелец в админке.</li>
+          <li>Мы не публикуем отзывы без источника и не покупаем рейтинг.</li>
+          <li>Рейтинг и количество отзывов — живые данные 2ГИС, их обновляет владелец.</li>
         </ul>
       </div>
     </section>
-    ${s.finalCtaSection({ settings, content, location })}
+    ${s.finalCta({ settings, content, location })}
   `;
   return page({
     title: `Отзывы о хоррор-квесте FANTOM — рейтинг ${String(settings.rating.value).replace('.', ',')} в 2ГИС`,
@@ -333,8 +303,9 @@ function faqPage(data) {
   const { settings, location, faq } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Вопросы', path: '/faq' }])}
-    ${s.faqSection({ faq, title: 'Частые вопросы' })}
-    ${s.finalCtaSection({ settings, content: data.content, location })}
+    ${s.faq({ faq })}
+    ${s.beforeYouGo({ settings, location, quest: data.quest })}
+    ${s.finalCta({ settings, content: data.content, location })}
   `;
   return page({
     title: 'Частые вопросы о хоррор-квесте FANTOM — цена, возраст, режимы',
@@ -357,50 +328,11 @@ function contactsPage(data) {
   const { settings, location, quest } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Контакты', path: '/contacts' }])}
+    ${s.locationSection({ settings, location })}
     <section class="section">
-      <div class="wrap contacts-grid">
-        <div>
-          ${s.sectionHead({ eyebrow: 'Контакты', title: 'FANTOM в Усть-Каменогорске' })}
-          <ul class="location-list">
-            <li><span>Адрес</span><b>${esc(location.fullAddress)}</b></li>
-            <li><span>Этаж</span><b>${esc(location.floor)}</b></li>
-            <li><span>График</span><b>${esc(settings.hours.label)}</b></li>
-            <li><span>Таймзона</span><b>${esc(settings.timezone)}</b></li>
-            <li><span>Телефон</span><b><a href="tel:${esc(settings.phoneE164)}">${esc(settings.phone)}</a></b></li>
-            <li><span>WhatsApp</span><b><a href="${esc(settings.whatsappUrl)}" rel="noopener">Написать</a></b></li>
-            <li><span>Instagram</span><b><a href="${esc(settings.instagramUrl)}" rel="noopener">${esc(settings.instagramHandle)}</a></b></li>
-            <li><span>Оплата</span><b>${settings.payments.methods.map((m) => esc(m)).join(', ')}</b></li>
-          </ul>
-          <div class="location-actions">
-            <a class="btn btn-blood" href="${esc(location.routeUrl)}" rel="noopener">Построить маршрут</a>
-            <a class="btn btn-outline" href="/booking">Выбрать время</a>
-          </div>
-        </div>
-        <div>
-          <a class="location-photo" href="${esc(location.galleryUrl)}" rel="noopener" target="_blank">
-            <img src="/images/gallery/entrance-street-1000.webp" alt="Вход в локацию FANTOM с улицы" width="1000" height="750" loading="lazy" decoding="async">
-            <span>Вход: белая кирпичная стена, чёрная вывеска QUEST ROOM FANTOM</span>
-          </a>
-          <div class="panel">
-            <p class="panel-title">Как найти</p>
-            <p>${esc(location.entranceNote)}</p>
-            <p class="panel-note">Мы на цокольном этаже. Координаты: ${esc(String(location.lat))}, ${esc(String(location.lng))}.</p>
-          </div>
-          <div class="panel">
-            <p class="panel-title">Не подтверждено</p>
-            ${(settings.unconfirmedFields || [])
-              .slice(0, 4)
-              .map((field) => `<p class="panel-item"><b>${esc(field.label)}</b><span>${esc(field.note)}</span></p>`)
-              .join('')}
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section--alt">
       <div class="wrap two-col">
         <div class="panel">
-          <p class="panel-title">О квесте</p>
+          <p class="panel-title">О локации</p>
           <p>${esc(quest.shortDescription)}</p>
           <p class="panel-note">${esc(quest.ageNote)}</p>
         </div>
@@ -414,6 +346,8 @@ function contactsPage(data) {
         </div>
       </div>
     </section>
+    ${s.faq({ faq: data.faq, limit: 5 })}
+    ${s.finalCta({ settings, content: data.content, location })}
   `;
   return page({
     title: 'Контакты FANTOM — Назарбаева, 50, Усть-Каменогорск',
@@ -433,28 +367,9 @@ function contactsPage(data) {
 /* ── Запись ─────────────────────────────────────────────────────────────── */
 
 function bookingPage(data) {
-  const { settings, location, packages, days } = data;
   const body = `
     ${crumbs([{ name: 'Главная', path: '/' }, { name: 'Запись', path: '/booking' }])}
-    <section class="section section--booking">
-      <div class="wrap">
-        ${s.sectionHead({
-          eyebrow: 'Бронирование',
-          title: 'Выберите пакет и время',
-          lead: 'Три шага, около минуты. Заявка ничего не оплачивает — администратор подтвердит время.'
-        })}
-        ${s.bookingWizard({
-          settings,
-          packages,
-          days,
-          initialPackage: data.initialPackage,
-          initialDate: data.initialDate,
-          preselectedSlot: data.preselectedSlot
-        })}
-        ${s.bookingSuccess({ settings })}
-      </div>
-    </section>
-
+    ${bookingBlock(data)}
     <section class="section section--alt">
       <div class="wrap two-col">
         <div class="panel">
@@ -467,7 +382,7 @@ function bookingPage(data) {
         </div>
         <div class="panel">
           <p class="panel-title">Оплата</p>
-          <p>${esc(settings.payments.methods.join(', '))} — на месте.</p>
+          <p>${esc(data.settings.payments.methods.join(', '))} — на месте.</p>
           <p class="panel-note">Сайт не принимает платежи и не запрашивает данные карты.</p>
         </div>
       </div>
@@ -476,11 +391,11 @@ function bookingPage(data) {
   return page({
     title: 'Запись на хоррор-квест FANTOM — выбрать дату и время',
     description:
-      'Выберите пакет, дату и свободное время. Заявка бесплатная: администратор FANTOM подтвердит бронь в WhatsApp, Telegram или звонком.',
+      'Выберите программу, дату и свободное время. Заявка бесплатная: администратор FANTOM подтвердит бронь в WhatsApp, Telegram или звонком.',
     path: '/booking',
     body,
-    settings,
-    location,
+    settings: data.settings,
+    location: data.location,
     jsonLd: [jsonld.breadcrumbs([{ name: 'Главная', path: '/' }, { name: 'Запись', path: '/booking' }])]
   });
 }
@@ -512,10 +427,10 @@ function bookingStatusPage(data) {
           <p class="panel-title">Заявка <span data-result-ref></span></p>
           <ul class="summary-list">
             <li><span>Статус</span><b data-result-status>—</b></li>
-            <li><span>Пакет</span><b data-result-package>—</b></li>
+            <li><span>Программа</span><b data-result-package>—</b></li>
             <li><span>Дата</span><b data-result-date>—</b></li>
             <li><span>Время</span><b data-result-time>—</b></li>
-            <li><span>Игроков</span><b data-result-guests>—</b></li>
+            <li><span>Гостей</span><b data-result-guests>—</b></li>
           </ul>
           <a class="btn btn-outline" href="${esc(settings.whatsappUrl)}" rel="noopener">Написать администратору</a>
         </div>
@@ -559,7 +474,7 @@ function privacyPage(data) {
         <p>Данные не продаются. Технические сервисы доставки уведомлений получают только текст заявки.</p>
         <h2>Контакты</h2>
         <p>${esc(settings.brand.legalName)}<br>${esc(location.fullAddress)}<br>${esc(settings.phone)}</p>
-        <p class="legal-foot">Версия черновика 1.1 · составлена ${esc(settings.rating.updatedAt)}</p>
+        <p class="legal-foot">Версия черновика 1.2 · составлена ${esc(settings.rating.updatedAt)}</p>
       </div>
     </section>
   `;

@@ -1,17 +1,19 @@
 /* FANTOM — клиентский слой.
-   Задачи: навигация, атмосферные эффекты, галерея, звук (выключен по умолчанию),
-   мастер записи и аналитика событий.
+   Навигация, атмосферные эффекты, галерея, звук, каталог с фильтрами,
+   шестишаговая запись и аналитика.
 
    Правила: звук не стартует сам; при prefers-reduced-motion движение выключено;
-   ни один эффект не блокирует контент и кнопку записи; при ошибке данные формы
-   не теряются. */
+   ни один эффект не закрывает контент и кнопку записи; при ошибке данные формы
+   не теряются; в интерфейсе нет ни слова о техническом состоянии стенда. */
 
 (function () {
   'use strict';
 
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ── Аналитика: только обезличенные события ───────────────────────────── */
+  /* ── Аналитика ────────────────────────────────────────────────────────── */
+
+  var PII_KEYS = ['name', 'phone', 'comment', 'email'];
 
   function track(event, payload) {
     var detail = Object.assign({ event: event }, payload || {});
@@ -20,9 +22,7 @@
     document.dispatchEvent(new CustomEvent('fantom:event', { detail: detail }));
   }
 
-  /** Никогда не отправляем имя, телефон и комментарий. */
-  var PII_KEYS = ['name', 'phone', 'comment', 'email'];
-
+  /** Отправляем только обезличенные данные: имя, телефон и комментарий — никогда. */
   function trackSafe(event, payload) {
     var safe = {};
     Object.keys(payload || {}).forEach(function (key) {
@@ -41,7 +41,6 @@
     toggle.addEventListener('click', function () {
       var open = nav.classList.toggle('is-open');
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (open) track('nav_opened');
     });
 
     nav.addEventListener('click', function (event) {
@@ -52,7 +51,7 @@
     });
   }
 
-  /* ── Появление секций: как будто открывается дверь ───────────────────── */
+  /* ── Появление секций ─────────────────────────────────────────────────── */
 
   function initReveal() {
     var nodes = document.querySelectorAll('[data-reveal]');
@@ -60,7 +59,7 @@
 
     nodes.forEach(function (node) {
       node.style.opacity = '0';
-      node.style.transform = 'translateY(14px)';
+      node.style.transform = 'translateY(16px)';
       node.style.transition = 'opacity .7s cubic-bezier(.22,.61,.36,1), transform .7s cubic-bezier(.22,.61,.36,1)';
     });
 
@@ -73,7 +72,7 @@
           observer.unobserve(entry.target);
         });
       },
-      { rootMargin: '0px 0px -12% 0px', threshold: 0.12 }
+      { rootMargin: '0px 0px -10% 0px', threshold: 0.1 }
     );
 
     nodes.forEach(function (node) {
@@ -81,7 +80,7 @@
     });
   }
 
-  /* ── Hero: лёгкий отклик на курсор, только на десктопе ───────────────── */
+  /* ── Hero: лёгкий отклик на курсор, только там, где есть мышь ─────────── */
 
   function initHero() {
     var hero = document.querySelector('[data-hero]');
@@ -97,37 +96,33 @@
     var currentY = 0;
     var raf = null;
 
+    function step() {
+      currentX += (targetX - currentX) * 0.07;
+      currentY += (targetY - currentY) * 0.07;
+      image.style.transform = 'translate3d(' + currentX.toFixed(2) + 'px,' + currentY.toFixed(2) + 'px,0) scale(1.06)';
+      if (Math.abs(targetX - currentX) > 0.2 || Math.abs(targetY - currentY) > 0.2) raf = requestAnimationFrame(step);
+      else raf = null;
+    }
+
     hero.addEventListener('mousemove', function (event) {
       var rect = hero.getBoundingClientRect();
       targetX = ((event.clientX - rect.left) / rect.width - 0.5) * 18;
       targetY = ((event.clientY - rect.top) / rect.height - 0.5) * 12;
       if (!raf) raf = requestAnimationFrame(step);
     });
-
-    function step() {
-      currentX += (targetX - currentX) * 0.08;
-      currentY += (targetY - currentY) * 0.08;
-      image.style.transform = 'translate3d(' + currentX.toFixed(2) + 'px,' + currentY.toFixed(2) + 'px,0) scale(1.05)';
-      if (Math.abs(targetX - currentX) > 0.2 || Math.abs(targetY - currentY) > 0.2) {
-        raf = requestAnimationFrame(step);
-      } else {
-        raf = null;
-      }
-    }
   }
 
-  /* ── Панель контактов и звук: не мешают контенту и клавиатуре ─────────── */
+  /* ── Панель контактов ─────────────────────────────────────────────────── */
 
   function initContactBar() {
     var bar = document.querySelector('[data-contact-bar]');
     if (!bar) return;
 
     var lastY = window.scrollY;
-    var hideTimer = null;
-
-    function setHidden(hidden) {
+    var timer = null;
+    var setHidden = function (hidden) {
       bar.classList.toggle('is-hidden', hidden);
-    }
+    };
 
     window.addEventListener(
       'scroll',
@@ -140,25 +135,23 @@
       { passive: true }
     );
 
-    // Пока пользователь заполняет форму, панель убирается: она не должна
-    // закрывать поля и мешать мобильной клавиатуре.
     document.addEventListener('focusin', function (event) {
       if (event.target.matches('input, textarea, select')) {
         setHidden(true);
-        clearTimeout(hideTimer);
+        clearTimeout(timer);
       }
     });
 
     document.addEventListener('focusout', function (event) {
       if (event.target.matches('input, textarea, select')) {
-        hideTimer = setTimeout(function () {
+        timer = setTimeout(function () {
           setHidden(false);
         }, 400);
       }
     });
   }
 
-  /* ── Звук: WebAudio, только по явному нажатию ─────────────────────────── */
+  /* ── Звук ─────────────────────────────────────────────────────────────── */
 
   function initSound() {
     var button = document.querySelector('[data-sound-toggle]');
@@ -172,19 +165,16 @@
     function build() {
       var AudioCtor = window.AudioContext || window.webkitAudioContext;
       ctx = new AudioCtor();
-
       master = ctx.createGain();
       master.gain.value = 0;
       master.connect(ctx.destination);
 
-      // Низкий гул подвала.
       var drone = ctx.createOscillator();
       drone.type = 'sawtooth';
       drone.frequency.value = 41;
       var droneGain = ctx.createGain();
       droneGain.gain.value = 0.05;
 
-      // Шум вентиляции через низкочастотный фильтр.
       var size = 2 * ctx.sampleRate;
       var buffer = ctx.createBuffer(1, size, ctx.sampleRate);
       var data = buffer.getChannelData(0);
@@ -213,14 +203,13 @@
       var now = ctx.currentTime;
       master.gain.cancelScheduledValues(now);
       master.gain.linearRampToValueAtTime(next ? 0.55 : 0, now + (reduceMotion ? 0.02 : 1.4));
-
       button.setAttribute('aria-pressed', next ? 'true' : 'false');
       if (label) label.textContent = next ? 'Звук включён' : 'Звук выключен';
       track('sound_toggled', { state: next ? 'on' : 'off' });
     });
   }
 
-  /* ── Галерея: лента со свайпом + полноэкранный просмотр ───────────────── */
+  /* ── Галерея ──────────────────────────────────────────────────────────── */
 
   function initGallery() {
     var dataNode = document.querySelector('[data-gallery-data]');
@@ -246,7 +235,7 @@
       image.src = item.src;
       image.alt = item.alt || item.caption || '';
       caption.textContent = item.caption + (item.author ? ' · ' + item.author : '');
-      trackSafe('gallery_viewed', { index: index, caption: item.caption });
+      trackSafe('gallery_viewed', { index: index });
     }
 
     function open(startIndex) {
@@ -276,7 +265,6 @@
     lightbox.querySelector('[data-lightbox-next]').addEventListener('click', function () {
       show(index + 1);
     });
-
     lightbox.addEventListener('click', function (event) {
       if (event.target === lightbox) close();
     });
@@ -288,25 +276,47 @@
       if (event.key === 'ArrowRight') show(index + 1);
     });
 
-    // Свайп на мобильном внутри просмотрщика.
     var startX = null;
-    lightbox.addEventListener(
-      'touchstart',
-      function (event) {
-        startX = event.touches[0].clientX;
-      },
-      { passive: true }
-    );
-    lightbox.addEventListener(
-      'touchend',
-      function (event) {
-        if (startX === null) return;
-        var delta = event.changedTouches[0].clientX - startX;
-        if (Math.abs(delta) > 45) show(delta < 0 ? index + 1 : index - 1);
-        startX = null;
-      },
-      { passive: true }
-    );
+    lightbox.addEventListener('touchstart', function (event) { startX = event.touches[0].clientX; }, { passive: true });
+    lightbox.addEventListener('touchend', function (event) {
+      if (startX === null) return;
+      var delta = event.changedTouches[0].clientX - startX;
+      if (Math.abs(delta) > 45) show(delta < 0 ? index + 1 : index - 1);
+      startX = null;
+    }, { passive: true });
+  }
+
+  /* ── Фильтры каталога ─────────────────────────────────────────────────── */
+
+  function initCatalogFilters() {
+    var catalog = document.querySelector('[data-catalog]');
+    if (!catalog) return;
+
+    var chips = Array.prototype.slice.call(document.querySelectorAll('[data-filter]'));
+    var counter = document.querySelector('[data-filter-count]');
+    var cards = Array.prototype.slice.call(catalog.querySelectorAll('.quest-card'));
+    if (!chips.length || cards.length < 2) return;
+
+    chips.forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var value = chip.dataset.filter;
+        chips.forEach(function (other) {
+          var active = other === chip;
+          other.classList.toggle('is-active', active);
+          other.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+
+        var shown = 0;
+        cards.forEach(function (card) {
+          var match = value === 'all' || card.dataset.duration === value;
+          card.hidden = !match;
+          if (match) shown += 1;
+        });
+
+        if (counter) counter.textContent = 'Показано: ' + shown + ' из ' + cards.length;
+        track('catalog_filtered', { filter: value, shown: shown });
+      });
+    });
   }
 
   /* ── Утилиты форм ─────────────────────────────────────────────────────── */
@@ -338,7 +348,7 @@
     });
   }
 
-  /** Форматирование казахстанского номера без блокировки вставки. */
+  /** Форматирование казахстанского номера без блокировки вставки из буфера. */
   function formatPhone(value) {
     var digits = String(value).replace(/\D/g, '');
     if (digits.startsWith('8')) digits = '7' + digits.slice(1);
@@ -356,9 +366,9 @@
   function initPhoneMask() {
     document.querySelectorAll('input[type="tel"]').forEach(function (input) {
       input.addEventListener('input', function () {
-        var caretAtEnd = input.selectionStart === input.value.length;
+        var atEnd = input.selectionStart === input.value.length;
         input.value = formatPhone(input.value);
-        if (caretAtEnd) input.setSelectionRange(input.value.length, input.value.length);
+        if (atEnd) input.setSelectionRange(input.value.length, input.value.length);
       });
       input.addEventListener('blur', function () {
         if (input.value.replace(/\D/g, '').length <= 1) input.value = '';
@@ -369,15 +379,19 @@
   function formatDateRu(iso) {
     if (!iso) return '—';
     var parts = iso.split('-').map(Number);
-    var date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
     try {
-      return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'short', timeZone: 'UTC' });
+      return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])).toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        weekday: 'short',
+        timeZone: 'UTC'
+      });
     } catch (error) {
       return iso;
     }
   }
 
-  /* ── Мастер записи ────────────────────────────────────────────────────── */
+  /* ── Мастер записи: шесть шагов ───────────────────────────────────────── */
 
   function initBooking() {
     var form = document.getElementById('booking-form');
@@ -386,34 +400,44 @@
     var state = {
       step: 1,
       packageId: form.dataset.initialPackage || '',
+      packageName: '',
+      packageDuration: '',
+      packagePrice: '',
+      date: form.dataset.initialDate || '',
+      dateLabel: '',
       slot: null,
-      startedAt: Date.now(),
+      guests: Number((form.querySelector('#guests') || {}).value || 4),
       busy: false,
-      // Ключ идемпотентности: защищает от двойной заявки при двойном клике
-      // и при повторной отправке после сетевой ошибки.
+      confirmShown: false,
+      startedAt: Date.now(),
       idempotencyKey:
         window.crypto && window.crypto.randomUUID
           ? window.crypto.randomUUID()
           : 'k' + Date.now() + Math.random().toString(16).slice(2)
     };
+
     var steps = Array.prototype.slice.call(form.querySelectorAll('[data-step]'));
     var indicators = Array.prototype.slice.call(form.querySelectorAll('[data-progress-step]'));
     var slotPicker = form.querySelector('[data-slot-picker]');
     var slotStatus = form.querySelector('[data-slot-status]');
+    var slotDay = form.querySelector('[data-slot-day]');
     var errorBox = form.querySelector('[data-form-error]');
     var submitBtn = form.querySelector('[data-submit]');
     var packageInput = form.querySelector('#packageId');
-    var dateSelect = form.querySelector('#date');
+    var dateInput = form.querySelector('#date');
     var timeInput = form.querySelector('#time');
     var guestsInput = form.querySelector('#guests');
+    var guestsValue = form.querySelector('[data-guests-value]');
+    var confirmList = form.querySelector('[data-confirm]');
     var success = document.querySelector('[data-success]');
 
-    var summaryNodes = {
+    var summary = {
       package: document.querySelector('[data-summary-package]'),
       duration: document.querySelector('[data-summary-duration]'),
       date: document.querySelector('[data-summary-date]'),
       time: document.querySelector('[data-summary-time]'),
-      guests: document.querySelector('[data-summary-guests]')
+      guests: document.querySelector('[data-summary-guests]'),
+      price: document.querySelector('[data-summary-price]')
     };
 
     var initialSlot = form.dataset.initialSlot || '';
@@ -429,9 +453,11 @@
         item.classList.toggle('is-done', index < step);
       });
       if (step > 1) {
-        var field = form.querySelector('[data-step="' + step + '"] input, [data-step="' + step + '"] select');
+        var field = form.querySelector('[data-step="' + step + '"] input, [data-step="' + step + '"] button');
         if (field) field.focus({ preventScroll: true });
       }
+      var anchor = form.getBoundingClientRect().top + window.scrollY - 90;
+      if (window.scrollY > anchor) window.scrollTo({ top: anchor, behavior: reduceMotion ? 'auto' : 'smooth' });
     }
 
     function setError(message) {
@@ -441,64 +467,87 @@
     }
 
     function syncSummary() {
-      var chosen = form.querySelector('[data-package="' + state.packageId + '"]');
-      if (summaryNodes.package) {
-        summaryNodes.package.textContent = chosen
-          ? chosen.querySelector('.package-option-name').textContent
-          : '—';
-      }
-      if (summaryNodes.duration) {
-        summaryNodes.duration.textContent = chosen ? chosen.dataset.packageDuration || '—' : '—';
-      }
-      if (summaryNodes.date) {
-        summaryNodes.date.textContent = dateSelect.value ? formatDateRu(dateSelect.value) : '—';
-      }
-      if (summaryNodes.time) {
-        summaryNodes.time.textContent = state.slot
+      if (summary.package) summary.package.textContent = state.packageName || '—';
+      if (summary.duration) summary.duration.textContent = state.packageDuration || '—';
+      if (summary.date) summary.date.textContent = state.dateLabel || formatDateRu(state.date);
+      if (summary.time) {
+        summary.time.textContent = state.slot
           ? timeInput.value + (state.slot.crossesMidnight ? ' (после полуночи)' : '')
           : '—';
       }
-      if (summaryNodes.guests) {
-        summaryNodes.guests.textContent = guestsInput.value ? guestsInput.value + ' чел.' : '—';
-      }
+      if (summary.guests) summary.guests.textContent = state.guests ? state.guests + ' чел.' : '—';
+      if (summary.price) summary.price.textContent = state.packagePrice || 'уточнит администратор';
     }
 
-    function selectPackage(button) {
-      form.querySelectorAll('.package-option').forEach(function (other) {
-        other.setAttribute('aria-checked', other === button ? 'true' : 'false');
-      });
-      state.packageId = button.dataset.package;
-      packageInput.value = state.packageId;
-      setError('');
-      syncSummary();
-      track('quest_selected', { package: state.packageId });
-    }
-
+    /* Шаг 1. Программа */
     form.querySelectorAll('.package-option').forEach(function (button) {
       button.addEventListener('click', function () {
-        selectPackage(button);
+        form.querySelectorAll('.package-option').forEach(function (other) {
+          other.setAttribute('aria-checked', other === button ? 'true' : 'false');
+        });
+        state.packageId = button.dataset.package;
+        state.packageName = button.dataset.packageName;
+        state.packageDuration = button.dataset.packageDuration;
+        state.packagePrice = button.dataset.packagePrice;
+        packageInput.value = state.packageId;
+        setError('');
+        syncSummary();
+        track('quest_selected', { package: state.packageId });
       });
     });
 
     if (state.packageId) {
       var preset = form.querySelector('[data-package="' + state.packageId + '"]');
-      if (preset) preset.setAttribute('aria-checked', 'true');
-    }
-
-    function validateStep1() {
-      if (!packageInput.value) {
-        setError('Выберите пакет — от него зависит время и цена.');
-        return false;
+      if (preset) {
+        preset.setAttribute('aria-checked', 'true');
+        state.packageName = preset.dataset.packageName;
+        state.packageDuration = preset.dataset.packageDuration;
+        state.packagePrice = preset.dataset.packagePrice;
       }
-      setError('');
-      return true;
     }
 
-    function loadSlots(date) {
-      slotPicker.innerHTML = '<p class="slot-hint">Загружаем свободные слоты…</p>';
-      if (slotStatus) slotStatus.textContent = '';
+    /* Шаг 2. Дата */
+    var dateChips = Array.prototype.slice.call(form.querySelectorAll('.date-chip'));
 
-      fetch('/api/availability?date=' + encodeURIComponent(date), { headers: { accept: 'application/json' } })
+    function selectDate(chip) {
+      dateChips.forEach(function (other) {
+        var active = other === chip;
+        other.classList.toggle('is-active', active);
+        other.setAttribute('aria-checked', active ? 'true' : 'false');
+      });
+      state.date = chip.dataset.date;
+      state.dateLabel = chip.dataset.dateLabel;
+      dateInput.value = state.date;
+      state.slot = null;
+      timeInput.value = '';
+      setError('');
+      syncSummary();
+      track('date_selected', { date: state.date });
+    }
+
+    dateChips.forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        selectDate(chip);
+      });
+    });
+
+    if (state.date) {
+      var initialChip = dateChips.filter(function (chip) { return chip.dataset.date === state.date; })[0];
+      if (initialChip) selectDate(initialChip);
+    }
+
+    /* Шаг 3. Время */
+    function loadSlots() {
+      if (!state.date) return;
+      slotPicker.innerHTML = '<p class="slot-hint">Загружаем свободное время…</p>';
+      if (slotStatus) slotStatus.textContent = '';
+      if (slotDay) {
+        slotDay.textContent = state.dateLabel
+          ? 'Игровой день: ' + state.dateLabel + '. Свободное время ниже.'
+          : 'Игровой день: ' + formatDateRu(state.date);
+      }
+
+      fetch('/api/availability?date=' + encodeURIComponent(state.date), { headers: { accept: 'application/json' } })
         .then(function (response) {
           if (!response.ok) throw new Error('HTTP ' + response.status);
           return response.json();
@@ -506,8 +555,8 @@
         .then(renderSlots)
         .catch(function () {
           slotPicker.innerHTML =
-            '<p class="slot-hint">Не удалось загрузить слоты. Данные формы сохранены — обновите страницу или напишите в WhatsApp.</p>';
-          if (slotStatus) slotStatus.textContent = 'Ошибка сети.';
+            '<p class="slot-hint">Не удалось загрузить время. Данные формы сохранены — обновите страницу или напишите нам.</p>';
+          if (slotStatus) slotStatus.textContent = 'Нет связи.';
         });
     }
 
@@ -517,7 +566,7 @@
       });
 
       if (!open.length) {
-        slotPicker.innerHTML = '<p class="slot-hint">На этот день свободных слотов нет. Выберите другой игровой день.</p>';
+        slotPicker.innerHTML = '<p class="slot-hint">На этот день свободного времени нет. Выберите другой игровой день.</p>';
         timeInput.value = '';
         state.slot = null;
         syncSummary();
@@ -529,8 +578,7 @@
           return (
             '<button type="button" class="slot-btn" role="radio" aria-checked="false" data-slot="' +
             slot.time +
-            '">' +
-            '<span>' +
+            '"><span>' +
             slot.time +
             '</span>' +
             (slot.crossesMidnight ? '<small>после полуночи</small>' : '') +
@@ -541,7 +589,7 @@
 
       if (slotStatus) {
         slotStatus.textContent =
-          'Свободно: ' + open.filter(function (s) { return s.status === 'open'; }).length + '. Таймзона ' + data.timezone + '.';
+          'Свободно: ' + open.filter(function (item) { return item.status === 'open'; }).length + '. Таймзона ' + data.timezone + '.';
       }
 
       var buttons = Array.prototype.slice.call(slotPicker.querySelectorAll('.slot-btn'));
@@ -554,7 +602,7 @@
         state.slot = open.filter(function (slot) { return slot.time === button.dataset.slot; })[0] || null;
         setError('');
         syncSummary();
-        track('time_selected', { date: dateSelect.value, time: button.dataset.slot, crosses_midnight: Boolean(state.slot && state.slot.crossesMidnight) });
+        track('time_selected', { date: state.date, time: button.dataset.slot });
       }
 
       buttons.forEach(function (button, index) {
@@ -579,13 +627,71 @@
           select(wanted);
           initialSlot = '';
         }
-      } else if (state.slot) {
-        var previous = buttons.filter(function (button) { return button.dataset.slot === state.slot.time; })[0];
-        if (previous) select(previous);
       }
     }
 
+    /* Шаг 4. Гости */
+    function setGuests(next) {
+      state.guests = Math.min(Math.max(next, 1), 30);
+      guestsInput.value = state.guests;
+      if (guestsValue) guestsValue.textContent = state.guests;
+      syncSummary();
+    }
+
+    var minus = form.querySelector('[data-guests-minus]');
+    var plus = form.querySelector('[data-guests-plus]');
+    if (minus) minus.addEventListener('click', function () { setGuests(state.guests - 1); });
+    if (plus) plus.addEventListener('click', function () { setGuests(state.guests + 1); });
+    setGuests(state.guests);
+
+    /* Шаг 6. Подтверждение */
+    function renderConfirm() {
+      if (!confirmList) return;
+      var rows = [
+        ['Программа', state.packageName || '—'],
+        ['Длительность', state.packageDuration || '—'],
+        ['Дата', state.dateLabel || formatDateRu(state.date)],
+        ['Время', timeInput.value + (state.slot && state.slot.crossesMidnight ? ' (после полуночи)' : '')],
+        ['Гостей', state.guests + ' чел.'],
+        ['Цена', state.packagePrice || 'уточнит администратор'],
+        ['Имя', form.querySelector('#name').value || '—'],
+        ['Телефон', form.querySelector('#phone').value || '—']
+      ];
+      confirmList.innerHTML = rows
+        .map(function (row) {
+          return '<div class="confirm-row"><dt>' + esc(row[0]) + '</dt><dd>' + esc(row[1]) + '</dd></div>';
+        })
+        .join('');
+    }
+
+    function esc(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /* Навигация по шагам */
+    function validateStep1() {
+      if (!packageInput.value) {
+        setError('Выберите программу — от неё зависят время и цена.');
+        return false;
+      }
+      setError('');
+      return true;
+    }
+
     function validateStep2() {
+      if (!dateInput.value) {
+        setError('Выберите дату.');
+        return false;
+      }
+      setError('');
+      return true;
+    }
+
+    function validateStep3() {
       if (!timeInput.value) {
         if (slotStatus) slotStatus.textContent = 'Выберите свободное время — без него заявку отправить нельзя.';
         setError('Выберите свободное время.');
@@ -595,13 +701,12 @@
       return true;
     }
 
-    function validateStep3() {
+    function validateStep5() {
       clearErrors(form);
       var ok = true;
       var name = form.querySelector('#name');
       var phone = form.querySelector('#phone');
       var consent = form.querySelector('#consent');
-      var guests = Number(guestsInput.value);
 
       if (name.value.trim().length < 2) {
         fieldError(name, 'Укажите имя.');
@@ -609,10 +714,6 @@
       }
       if (String(phone.value).replace(/\D/g, '').length < 11) {
         fieldError(phone, 'Телефон в формате +7 700 000 00 00.');
-        ok = false;
-      }
-      if (!Number.isFinite(guests) || guests < 1 || guests > 30) {
-        fieldError(guestsInput, 'Укажите количество гостей от 1 до 30.');
         ok = false;
       }
       if (!consent.checked) {
@@ -629,32 +730,27 @@
         var target = Number(next.dataset.next);
         if (state.step === 1 && !validateStep1()) return;
         if (state.step === 2 && !validateStep2()) return;
+        if (state.step === 3 && !validateStep3()) return;
+        if (state.step === 5 && !validateStep5()) return;
+        if (target === 6) renderConfirm();
         showStep(target);
         track('booking_step', { step: target });
       }
       if (back) showStep(Number(back.dataset.back));
     });
 
-    dateSelect.addEventListener('change', function () {
-      state.slot = null;
-      timeInput.value = '';
-      syncSummary();
-      loadSlots(dateSelect.value);
-      track('date_selected', { date: dateSelect.value });
-    });
-
-    guestsInput.addEventListener('input', syncSummary);
-
-    var submitted = false;
-
+    /* Отправка */
     form.addEventListener('submit', function (event) {
       event.preventDefault();
-      if (state.busy || submitted) return;
-      if (!validateStep2()) {
-        showStep(2);
+      if (state.busy) return;
+      if (!validateStep3()) {
+        showStep(3);
         return;
       }
-      if (!validateStep3()) return;
+      if (!validateStep5()) {
+        showStep(5);
+        return;
+      }
 
       state.busy = true;
       setError('');
@@ -665,9 +761,9 @@
 
       var payload = {
         packageId: packageInput.value,
-        date: dateSelect.value,
+        date: dateInput.value,
         time: timeInput.value,
-        guests: Number(guestsInput.value),
+        guests: state.guests,
         name: form.querySelector('#name').value,
         phone: form.querySelector('#phone').value,
         messenger: (form.querySelector('input[name="messenger"]:checked') || {}).value || 'whatsapp',
@@ -679,7 +775,12 @@
         idempotencyKey: state.idempotencyKey
       };
 
-      trackSafe('booking_submitted', { package: payload.packageId, date: payload.date, time: payload.time, guests: payload.guests });
+      trackSafe('booking_submitted', {
+        package: payload.packageId,
+        date: payload.date,
+        time: payload.time,
+        guests: payload.guests
+      });
 
       fetch('/api/bookings', {
         method: 'POST',
@@ -692,17 +793,11 @@
           });
         })
         .then(function (result) {
-          if (result.status >= 400 || !result.data.ok) {
-            onFailure(result.data);
-            return;
-          }
-          onSuccess(result.data);
+          if (result.status >= 400 || !result.data.ok) onFailure(result.data);
+          else onSuccess(result.data);
         })
         .catch(function () {
-          setError(
-            'Не удалось отправить заявку: нет связи с сервером. Данные сохранены в форме — ' +
-              'нажмите «Забронировать» ещё раз или напишите нам в WhatsApp.'
-          );
+          setError('Не удалось отправить заявку. Попробуйте ещё раз или напишите нам в WhatsApp.');
           track('booking_error', { reason: 'network' });
           restore();
         });
@@ -717,7 +812,7 @@
     }
 
     function onFailure(data) {
-      var message = data.message || 'Не удалось отправить заявку.';
+      var message = data.message || 'Не удалось отправить заявку. Попробуйте ещё раз или свяжитесь с нами.';
       if (data.errors) {
         Object.keys(data.errors).forEach(function (field) {
           var input = form.querySelector('#' + field) || form.querySelector('[name="' + field + '"]');
@@ -725,17 +820,14 @@
         });
       }
       if (data.code === 'slot_taken' || data.code === 'slot_blocked') {
-        message =
-          data.code === 'slot_taken'
-            ? 'Это время только что заняли. Выберите другое — данные формы сохранены.'
-            : 'Это время закрыто. Выберите другое — данные формы сохранены.';
-        showStep(2);
-        loadSlots(dateSelect.value);
+        message = 'Это время только что заняли. Выберите другое — данные формы сохранены.';
+        showStep(3);
+        loadSlots();
       } else if (data.code === 'rate_limited') {
         message = 'Слишком много заявок с одного адреса. Напишите в WhatsApp — ответим быстрее.';
       } else if (data.code === 'in_past' || data.code === 'off_grid' || data.code === 'outside_shift') {
         showStep(2);
-        loadSlots(dateSelect.value);
+        loadSlots();
       }
       setError(message);
       track('booking_error', { code: data.code || 'unknown' });
@@ -743,7 +835,6 @@
     }
 
     function onSuccess(data) {
-      submitted = true;
       state.busy = false;
       form.hidden = true;
       var card = document.querySelector('.summary-card');
@@ -756,7 +847,7 @@
       }
 
       setText('[data-success-ref]', booking.reference);
-      setText('[data-success-package]', booking.packageName || '—');
+      setText('[data-success-package]', booking.packageName);
       setText('[data-success-date]', booking.dateLabel);
       setText('[data-success-time]', booking.startTime + (booking.crossesMidnight ? ' (после полуночи)' : ''));
       setText('[data-success-guests]', booking.guests + ' чел.');
@@ -764,14 +855,11 @@
       var note = document.querySelector('[data-success-note]');
       if (note) {
         note.textContent =
-          'Администратор свяжется с вами в ' +
+          'Заявка принята. Администратор свяжется с вами в ' +
           (booking.messengerLabel || 'выбранном канале') +
-          ' и подтвердит заявку. Номер — ' +
+          ' и подтвердит время. Номер заявки — ' +
           booking.reference +
-          '. Цену подтвердит администратор: на сайте она не фиксируется.' +
-          (data.demoMode
-            ? ' ВНИМАНИЕ: это демонстрационный стенд — заявка не сохранена и администратору не отправлена.'
-            : '');
+          '. Цену подтвердит администратор: на сайте она не фиксируется.';
       }
 
       var wa = document.querySelector('[data-success-whatsapp]');
@@ -787,16 +875,8 @@
       track('booking_success', { package: booking.packageId, date: booking.businessDate, time: booking.startTime });
     }
 
-    // Первичная синхронизация и загрузка слотов.
-    if (dateSelect.value) loadSlots(dateSelect.value);
-    if (!state.packageId) {
-      var first = form.querySelector('.package-option');
-      if (first) {
-        state.packageId = first.dataset.package;
-        packageInput.value = state.packageId;
-        first.setAttribute('aria-checked', 'true');
-      }
-    }
+    /* Инициализация */
+    if (state.date) loadSlots();
     syncSummary();
     showStep(1);
   }
@@ -861,17 +941,17 @@
       var link = event.target.closest('a[href]');
       if (!link) return;
       var href = link.getAttribute('href') || '';
-      if (href.startsWith('tel:')) track('phone_clicked', { from: link.dataset.cta || 'link' });
-      else if (/wa\.me|whatsapp/i.test(href)) track('whatsapp_clicked', { from: link.dataset.cta || 'link' });
-      else if (/instagram\.com/i.test(href)) track('instagram_clicked', { from: link.dataset.cta || 'link' });
-      else if (/2gis|directions/i.test(href)) track('route_clicked', { from: link.dataset.cta || 'link' });
-      else if (href === '/booking') track('booking_started', { from: link.dataset.cta || 'link' });
+      var from = link.dataset.cta || 'link';
+      if (href.startsWith('tel:')) track('phone_clicked', { from: from });
+      else if (/wa\.me|whatsapp/i.test(href)) track('whatsapp_clicked', { from: from });
+      else if (/instagram\.com/i.test(href)) track('instagram_clicked', { from: from });
+      else if (/2gis|directions/i.test(href)) track('route_clicked', { from: from });
+      else if (href === '/booking') track('booking_started', { from: from });
     });
   }
 
   document.addEventListener('DOMContentLoaded', function () {
     track('page_view', { path: location.pathname });
-    // Отдельное событие для страницы локации — по списку из брифа.
     if (location.pathname === '/quests') track('quest_view', { path: location.pathname });
     initNav();
     initHero();
@@ -880,6 +960,7 @@
     initSound();
     initContactBar();
     initPhoneMask();
+    initCatalogFilters();
     initBooking();
     initStatus();
     initCtaTracking();

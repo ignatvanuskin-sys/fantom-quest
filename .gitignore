@@ -8,7 +8,9 @@ data/audit.log.jsonl
 .env
 .env.local
 .env*
+!.env.example
 .admin-token.txt
+.admin-credentials.txt
 
 # Артефакты проверок и черновая работа
 tests/artifacts/
@@ -17,6 +19,3 @@ media-output/
 *.log
 .DS_Store
 Thumbs.db
-.admin-credentials.txt
-.vercel
-.env*

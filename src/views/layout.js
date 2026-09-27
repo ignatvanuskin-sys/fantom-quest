@@ -4,10 +4,11 @@ const config = require('../config');
 const { esc, escJson } = require('../lib/validate');
 
 const NAV = [
-  { href: '/quests', label: 'Квест' },
-  { href: '/prices', label: 'Пакеты' },
+  { href: '/quests', label: 'Квесты' },
+  { href: '/#characters', label: 'Персонажи' },
   { href: '/gallery', label: 'Галерея' },
   { href: '/reviews', label: 'Отзывы' },
+  { href: '/faq', label: 'FAQ' },
   { href: '/contacts', label: 'Контакты' }
 ];
 
@@ -55,29 +56,15 @@ function header(settings, path) {
       <a class="btn btn-blood" href="/booking">Забронировать</a>
     </div>
   </div>
-  ${stageBanner()}
 </header>`;
 }
 
 /**
- * Плашка честности. Показывается, пока стенд не готов принимать реальные
- * заявки: либо нет постоянного хранилища (demoMode), либо включён MOCK_MODE.
+ * Публичный интерфейс не сообщает о техническом состоянии стенда.
+ * Режимы хранилища, MOCK_MODE и состояние уведомлений — внутренние детали:
+ * они описаны в README.md и PRODUCTION.md, а не на сайте.
+ * Посетитель не должен видеть ни «demo», ни «mock», ни «storage disabled».
  */
-function stageBanner() {
-  const parts = [];
-  if (config.demoMode) {
-    parts.push(
-      '<b>Демонстрационный стенд.</b> Постоянное хранилище не подключено: заявка не сохранится и не дойдёт до администратора. Для реальной брони напишите в WhatsApp.'
-    );
-  }
-  if (config.mockMode) {
-    parts.push('Режим <code>MOCK_MODE</code>: уведомления администратору не отправляются.');
-  }
-  if (!parts.length) return '';
-  return `<div class="stage-banner${config.demoMode ? ' stage-banner--demo' : ''}" role="status">
-    <div class="wrap"><strong>${config.demoMode ? 'Демо' : 'Тест'}</strong> ${parts.join(' ')}</div>
-  </div>`;
-}
 
 function footer(settings, location) {
   return `<footer class="site-footer">

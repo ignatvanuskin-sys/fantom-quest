@@ -120,13 +120,13 @@ async function run() {
 
   const PAGES = [
     ['/', 'Испытай свой страх'],
-    ['/quests', 'Кого вы встретите'],
+    ['/quests', 'Кто ждёт внутри'],
     ['/prices', 'Пакеты FANTOM'],
-    ['/gallery', 'Как это выглядит внутри'],
-    ['/booking', 'Выберите пакет и время'],
-    ['/reviews', 'Что говорят гости'],
+    ['/gallery', 'Кадры, снятые внутри'],
+    ['/booking', 'Выбери дату'],
+    ['/reviews', 'Что говорят после игры'],
     ['/faq', 'Частые вопросы'],
-    ['/contacts', 'FANTOM в Усть-Каменогорске'],
+    ['/contacts', 'Подвал на Назарбаева, 50'],
     ['/privacy', 'Обработка персональных данных'],
     ['/booking/status', 'Статус заявки'],
     ['/admin', 'Панель заявок']
@@ -573,15 +573,18 @@ async function run() {
 
   console.log('\n  — Режимы стенда —');
 
-  await test('Демо-режим: заявка доходит до успеха, но помечена как несохранённая', async () => {
+  await test('Технические детали стенда не попадают в ответ пользователю', async () => {
     const original = config.demoMode;
     config.demoMode = true;
     try {
       ratelimit.reset();
       const res = await postJson('/api/bookings', validBooking({ date: futureDate(28), time: '16:00' }));
       assert.strictEqual(res.status, 201);
-      assert.strictEqual(res.json.demoMode, true);
-      assert.ok(/Демонстрационный/.test(res.json.message));
+      const message = String(res.json.message).toLowerCase();
+      for (const word of ['демо', 'demo', 'mock', 'хранилищ', 'не сохран', 'не отправ', 'режим стенда']) {
+        assert.ok(!message.includes(word), `в ответе пользователю найдено «${word}»: ${res.json.message}`);
+      }
+      assert.ok(/Администратор свяжется/.test(res.json.message), 'ответ должен описывать обычный сценарий');
     } finally {
       config.demoMode = original;
     }
@@ -600,12 +603,36 @@ async function run() {
     }
   });
 
-  await test('Демо-плашка видна на сайте и на странице записи', async () => {
+  await test('Публичный интерфейс не сообщает о техническом режиме стенда', async () => {
+    // Требование брифа: посетитель не должен знать, какая база используется,
+    // подключено ли хранилище, работает ли mock и настроены ли уведомления.
+    const forbidden = [
+      'Демонстрацион',
+      'MOCK_MODE',
+      'demoMode',
+      'демо-режим',
+      'Демо-режим',
+      'не сохраняется',
+      'не дойдёт',
+      'не отправляются',
+      'Development mode',
+      'Test booking',
+      'storage disabled'
+    ];
+    const paths = ['/', '/quests', '/prices', '/gallery', '/booking', '/reviews', '/faq', '/contacts', '/booking/status'];
+
+    // Проверяем в обоих режимах: демо и обычном.
     const original = config.demoMode;
-    config.demoMode = true;
     try {
-      assert.ok((await get('/')).text.includes('Демонстрационный стенд'));
-      assert.ok((await get('/booking')).text.includes('Демонстрационный стенд'));
+      for (const demo of [true, false]) {
+        config.demoMode = demo;
+        for (const pathname of paths) {
+          const res = await get(pathname);
+          for (const word of forbidden) {
+            assert.ok(!res.text.includes(word), `${pathname} (demo=${demo}): в интерфейсе найдено «${word}»`);
+          }
+        }
+      }
     } finally {
       config.demoMode = original;
     }
@@ -722,7 +749,7 @@ async function run() {
 
   await test('Форма записи: labels, aria, touch-target, honeypot', async () => {
     const page = await get('/booking');
-    for (const needle of ['aria-label="Пакет"', 'for="phone"', 'for="name"', 'aria-live', 'role="radiogroup"', 'autocomplete="tel"', 'aria-required']) {
+    for (const needle of ['aria-label="Программа"', 'for="phone"', 'for="name"', 'aria-live', 'role="radiogroup"', 'autocomplete="tel"', 'aria-required']) {
       assert.ok(page.text.includes(needle), `нет ${needle}`);
     }
     assert.ok(page.text.includes('hp-field'), 'нужно honeypot-поле');

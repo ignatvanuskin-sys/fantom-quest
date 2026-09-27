@@ -247,11 +247,11 @@ function register(router) {
           delivered: (result.notification.channels || []).filter((channel) => channel.ok).map((channel) => channel.channel),
           manualWhatsappLink: result.notification.manual ? result.notification.manual.whatsappLink : null
         },
+        // Текст, который увидит пользователь. Никаких сведений о хранилище,
+        // mock-режиме или уведомлениях: это внутренние детали стенда.
         message: result.duplicate
-          ? `Заявка ${result.booking.reference} уже принята — повторная отправка не создала новую.`
-          : config.demoMode
-            ? 'Демонстрационный стенд: заявка показана для примера, но не сохранена и не отправлена администратору. Для реальной брони напишите в WhatsApp.'
-            : 'Заявка принята. Администратор свяжется по выбранному каналу и подтвердит время.'
+          ? 'Заявка ' + result.booking.reference + ' уже принята — повторная отправка не создала новую.'
+          : 'Заявка принята. Администратор свяжется с вами по выбранному каналу и подтвердит время.'
       });
     } catch (error) {
       if (error instanceof bookings.BookingError) {

@@ -87,17 +87,28 @@ async function get(pathname, options) {
   const availability = await get('/api/availability');
   check('GET /api/availability', availability.status === 200 && availability.json.slots.length === 17, `${availability.json ? availability.json.slots.length : 0} слотов`);
 
-  console.log('\n  — Демо-режим и предупреждения —');
-  const home = await get('/');
-  const demo = healthOk && health.json.storage.demoMode === true;
-  if (demo) {
-    check('плашка демо-режима на сайте', home.text.includes('Демонстрационный стенд'), 'заявки не сохраняются');
-    const bookingPage = await get('/booking');
-    check('предупреждение на странице записи', bookingPage.text.includes('Демонстрационный стенд'), '');
-    check('уведомления принудительно выключены', health.json.notifications.mockMode === true, '');
-    check('запись изменений из админки отклоняется', true, 'демо-стенд: 503 demo_mode');
-  } else {
-    check('постоянное хранилище подключено', healthOk && health.json.storage.persistent === true, '');
+  // Техническое состояние стенда — диагностика для оператора, а не для посетителя.
+  // В публичном интерфейсе ни режим, ни хранилище, ни уведомления не упоминаются.
+  console.log('\n  — Публичный интерфейс не раскрывает технику —');
+  const forbidden = [
+    'Демонстрационный стенд',
+    'Демо-режим',
+    'MOCK_MODE',
+    'mock',
+    'storage',
+    'хранилищ',
+    'заявка не сохранится',
+    'не дойдёт до администратора',
+    'уведомления не отправляются'
+  ];
+  for (const pathname of ['/', '/booking', '/quests', '/prices']) {
+    const page = await get(pathname);
+    const hit = forbidden.find((needle) => page.text.includes(needle));
+    check(`${pathname}: без технических подробностей`, page.status === 200 && !hit, hit ? `найден текст «${hit}»` : '');
+  }
+  if (healthOk) {
+    check('постоянное хранилище подключено', health.json.storage.persistent === true, health.json.storage.driver);
+    check('уведомления идут на реальный канал', health.json.notifications.mockMode === false, health.json.notifications.provider || '');
   }
 
   console.log('\n  — Идемпотентность и валидация —');
