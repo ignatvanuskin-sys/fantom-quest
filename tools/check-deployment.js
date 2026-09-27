@@ -216,6 +216,28 @@ async function get(pathname, options) {
     console.log('\n  Провалы:');
     for (const item of failed) console.log('   • ' + item.name);
   }
+
+  /*
+   * Итоговый вердикт: код корректен и приём заявок — разные вещи.
+   * «Зелёные» проверки означают, что сайт работает; принимать реальные брони
+   * он сможет только с постоянным хранилищем и включёнными уведомлениями.
+   * Оператору нужен один однозначный ответ, а не список галочек.
+   */
+  if (healthOk) {
+    const { storage, notifications } = health.json;
+    const reasons = [];
+    if (!storage.persistent) reasons.push('нет постоянного хранилища — заявки исчезнут при следующем деплое');
+    if (notifications.mockMode) reasons.push('уведомления выключены — бизнес не узнает о заявке');
+
+    console.log('');
+    if (reasons.length === 0) {
+      console.log('  ГОТОВ К ПРИЁМУ ЗАЯВОК: код, хранилище и уведомления в порядке.');
+    } else {
+      console.log('  ДЕМО-СТЕНД, НЕ ГОТОВ К ПРИЁМУ ЗАЯВОК:');
+      for (const reason of reasons) console.log('   • ' + reason);
+      console.log('  Что сделать: PRODUCTION.md, раздел «Осталось включить».');
+    }
+  }
   console.log('─'.repeat(78) + '\n');
   process.exit(failed.length ? 1 : 0);
 })().catch((error) => {
