@@ -58,11 +58,20 @@ const PAGES = [
   { name: 'admin', url: '/admin', title: 'Админка' }
 ];
 
+/*
+ * Мобильные ширины идут первыми и покрывают весь реальный парк телефонов:
+ * 320 (старые iPhone SE), 360/375/390/430 (основная масса Android и iPhone).
+ * Планшеты и десктоп — после них.
+ */
 const VIEWPORTS = [
+  { name: 'mobile-320', width: 320, height: 568, mobile: true },
   { name: 'mobile-360', width: 360, height: 780, mobile: true },
+  { name: 'mobile-375', width: 375, height: 812, mobile: true },
   { name: 'mobile-390', width: 390, height: 844, mobile: true },
   { name: 'mobile-430', width: 430, height: 880, mobile: true },
-  { name: 'mobile-1440', width: 1440, height: 900, mobile: false },
+  { name: 'tablet-768', width: 768, height: 1024, mobile: false },
+  { name: 'laptop-1024', width: 1024, height: 768, mobile: false },
+  { name: 'desktop-1280', width: 1280, height: 800, mobile: false },
   { name: 'desktop-1440', width: 1440, height: 900, mobile: false },
   { name: 'desktop-1920', width: 1920, height: 1080, mobile: false }
 ];
@@ -76,14 +85,16 @@ const VIEWPORTS = [
 const SHOT_PAGES = ['home', 'quest', 'prices', 'booking', 'contacts', 'admin', 'faq', 'reviews', 'gallery'];
 const SHOT_VIEWPORTS = ['mobile-390', 'desktop-1440'];
 const EXTRA_SHOTS = [
-  ['home', 'mobile-360'],
+  ['home', 'mobile-320'],
+  ['home', 'mobile-375'],
   ['home', 'mobile-430'],
+  ['home', 'tablet-768'],
   ['home', 'desktop-1920'],
-  ['booking', 'mobile-360'],
+  ['booking', 'mobile-320'],
+  ['booking', 'mobile-430'],
   ['booking', 'desktop-1920'],
-  ['quest', 'mobile-360'],
-  ['quests', 'mobile-390'],
-  ['how-it-works', 'desktop-1440'],
+  ['quest', 'mobile-320'],
+  ['prices', 'mobile-390'],
   ['privacy', 'desktop-1440']
 ];
 
@@ -459,41 +470,110 @@ async function run() {
   await client.once('Page.loadEventFired').catch(() => null);
   await sleep(1600);
 
+  /*
+   * Мастер записи состоит из 6 шагов, и раньше проверка этого не знала: она
+   * кликала «дальше» с первого шага без выбранной программы и получала
+   * «шаг 2 не активен» — то есть фиксировала корректный отказ как поломку.
+   * Теперь мастер проходится целиком, с проверками на каждом переходе.
+   */
+  const activeStep = () =>
+    evaluate(
+      client,
+      `(function () {
+        var el = document.querySelector('.wizard-step.is-active');
+        return el ? el.getAttribute('data-step') : null;
+      })()`
+    );
+
+  const clickNext = async (n) => {
+    await evaluate(client, `document.querySelector('[data-next="${n}"]').click()`);
+    await sleep(400);
+  };
+
   const slotButtons = await evaluate(client, `document.querySelectorAll('.slot-btn').length`);
   const step1Active = await evaluate(
     client,
     `document.querySelector('[data-step="1"]').classList.contains('is-active')`
   );
-  await evaluate(client, `document.querySelector('[data-next="2"]').click()`);
-  await sleep(400);
-  const step2Active = await evaluate(
-    client,
-    `document.querySelector('[data-step="2"]').classList.contains('is-active')`
-  );
+
+  // Шаг 1 без выбранной программы вперёд не пускает — это защита от пустой заявки.
+  await clickNext(2);
+  const blockedWithoutPackage = (await activeStep()) === '1';
+
+  // Шаг 1 → 2: выбираем программу.
+  await evaluate(client, `document.querySelector('.package-option').click()`);
+  await sleep(250);
+  await clickNext(2);
+  const step2Active = (await activeStep()) === '2';
+
+  // Шаг 2 → 3: выбираем дату.
+  await evaluate(client, `document.querySelector('.date-chip').click()`);
+  await sleep(250);
+  await clickNext(3);
+  const step3Active = (await activeStep()) === '3';
 
   const slotLabels = await evaluate(
     client,
     `JSON.stringify([...document.querySelectorAll('.slot-btn')].slice(0, 20).map(function (b) { return b.textContent.trim(); }))`
   );
 
-  // Выбираем слот и проверяем, что sticky-summary действительно обновляется:
-  // блок лежит вне <form>, и ошибка в селекторе оставляла бы его пустым.
+  // Шаг 3: выбираем время. Без него дальше тоже не пускает.
+  await clickNext(4);
+  const blockedWithoutSlot = (await activeStep()) === '3';
   await evaluate(client, `document.querySelector('.slot-btn').click()`);
   await sleep(400);
+
+  // Сводка лежит вне <form>: ошибка в селекторе оставила бы её пустой.
   const summaryValues = JSON.parse(
     await evaluate(
       client,
       `JSON.stringify({
-        quest: (document.querySelector('[data-summary-package]') || {}).textContent,
-        date: (document.querySelector('[data-summary-date]') || {}).textContent,
-        time: (document.querySelector('[data-summary-time]') || {}).textContent,
-        guests: (document.querySelector('[data-summary-guests]') || {}).textContent,
+        quest: ((document.querySelector('.summary-card [data-summary-package]') || document.querySelector('[data-summary-package]')) || {}).textContent,
+        date: ((document.querySelector('.summary-card [data-summary-date]') || document.querySelector('[data-summary-date]')) || {}).textContent,
+        time: ((document.querySelector('.summary-card [data-summary-time]') || document.querySelector('[data-summary-time]')) || {}).textContent,
+        guests: ((document.querySelector('.summary-card [data-summary-guests]') || document.querySelector('[data-summary-guests]')) || {}).textContent,
         hiddenTime: document.getElementById('time').value,
         selected: document.querySelectorAll('.slot-btn[aria-checked="true"]').length
       })`
     )
   );
-  await capture(client, 390, 1700, path.join(OUT, 'booking-step2-mobile-390.jpg'));
+  await capture(client, 390, 1700, path.join(OUT, 'booking-step3-mobile-390.jpg'));
+
+  /*
+   * Липкая сводка на мобильном прижата к низу экрана и легко перекрывает кнопку
+   * перехода. Проверяем именно пересечение прямоугольников, а не «на глаз».
+   */
+  const stickyOverlap = JSON.parse(
+    await evaluate(
+      client,
+      `(function () {
+        var card = document.querySelector('.summary-card');
+        if (!card) return JSON.stringify({ card: false });
+        card.scrollIntoView({ block: 'end' });
+        var cr = card.getBoundingClientRect();
+        var buttons = Array.prototype.slice.call(
+          document.querySelectorAll('.wizard-step.is-active .btn, .wizard-step.is-active button')
+        ).filter(function (b) {
+          var r = b.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        });
+        var covered = buttons.filter(function (b) {
+          var r = b.getBoundingClientRect();
+          var vertical = r.bottom > cr.top + 1 && r.top < cr.bottom - 1;
+          var horizontal = r.right > cr.left + 1 && r.left < cr.right - 1;
+          return vertical && horizontal;
+        });
+        return JSON.stringify({
+          card: true,
+          cardTop: Math.round(cr.top),
+          cardBottom: Math.round(cr.bottom),
+          buttons: buttons.length,
+          covered: covered.length,
+          coveredText: covered.map(function (b) { return b.textContent.trim().slice(0, 26); })
+        });
+      })()`
+    )
+  );
 
   const summaryPresent = await evaluate(client, `!!document.querySelector('.summary-card')`);
   const noPayButton = await evaluate(
@@ -502,29 +582,45 @@ async function run() {
   );
 
   report.checks = {
-    mockBannerVisible: mockBanner,
+    techBannerVisible: mockBanner,
     heroCtaLabels: ctaLabels,
     navHiddenBefore,
     navOpen: nav,
     soundDefault: sound,
     bookingSlotButtons: slotButtons,
     bookingStep1Active: step1Active,
+    bookingBlockedWithoutPackage: blockedWithoutPackage,
     bookingStep2Active: step2Active,
+    bookingStep3Active: step3Active,
+    bookingBlockedWithoutSlot: blockedWithoutSlot,
     slotLabels: JSON.parse(slotLabels),
     bookingSummaryAfterSlotPick: summaryValues,
     stickySummaryPresent: summaryPresent,
+    stickySummaryCoversButtons: stickyOverlap,
     noPaymentButton: noPayButton
   };
 
-  console.log(`  плашка режима стенда видна:            ${mockBanner ? 'да' : 'нет'}`);
+  console.log(`  технических плашек в интерфейсе:   ${mockBanner ? 'ЕСТЬ (проблема)' : 'нет'}`);
   console.log(`  CTA в hero:                        ${ctaLabels.join(' | ')}`);
   console.log(`  меню до клика:                     display=${navHiddenBefore}`);
   console.log(`  меню после клика:                  display=${nav.display}, aria-expanded=${nav.expanded}, ссылок=${nav.links}`);
   console.log(`  звук по умолчанию:                 hidden=${sound.hidden}, aria-pressed=${sound.pressed}`);
-  console.log(`  слотов на шаге 2:                  ${slotButtons}`);
-  console.log(`  шаг 1 активен до клика:            ${step1Active ? 'да' : 'нет'}`);
-  console.log(`  шаг 2 активен после клика:         ${step2Active ? 'да' : 'нет'}`);
+  console.log(`  кнопок слотов в мастере:           ${slotButtons}`);
+  console.log(`  шаг 1 активен на входе:            ${step1Active ? 'да' : 'нет'}`);
+  console.log(`  без программы вперёд не пускает:   ${blockedWithoutPackage ? 'да' : 'НЕТ (дыра)'}`);
+  console.log(`  шаг 2 после выбора программы:      ${step2Active ? 'да' : 'НЕТ (дыра)'}`);
+  console.log(`  шаг 3 после выбора даты:           ${step3Active ? 'да' : 'НЕТ (дыра)'}`);
+  console.log(`  без времени вперёд не пускает:     ${blockedWithoutSlot ? 'да' : 'НЕТ (дыра)'}`);
   console.log(`  sticky summary на месте:           ${summaryPresent ? 'да' : 'нет'}`);
+  console.log(
+    `  сводка не перекрывает кнопки:      ${
+      !stickyOverlap.card
+        ? 'сводка не найдена'
+        : stickyOverlap.covered === 0
+          ? `да (проверено кнопок: ${stickyOverlap.buttons})`
+          : `НЕТ — перекрыто: ${stickyOverlap.coveredText.join(', ')}`
+    }`
+  );
   console.log(
     `  summary после выбора слота:        сценарий="${String(summaryValues.quest).trim()}", ` +
       `дата="${String(summaryValues.date).trim()}", время="${String(summaryValues.time).trim()}", ` +
@@ -570,18 +666,29 @@ async function run() {
     '',
     '## Проверки поведения',
     '',
-    `- Плашка MOCK_MODE видна: ${mockBanner ? 'да' : 'нет'}`,
+    `- Технических плашек в интерфейсе нет: ${mockBanner ? 'НЕТ — плашка найдена' : 'да'}`,
     `- CTA в hero: ${ctaLabels.join(' | ')}`,
     `- Меню закрыто до клика: ${navHiddenBefore}`,
     `- Меню после клика: display=${nav.display}, aria-expanded=${nav.expanded}, ссылок=${nav.links}`,
     `- Звук по умолчанию: hidden=${sound.hidden}, aria-pressed=${sound.pressed}`,
-    `- Кнопок слотов на шаге 2: ${slotButtons}`,
-    `- Шаг 2 активируется по клику: ${step2Active ? 'да' : 'нет'}`,
+    `- Кнопок слотов в мастере: ${slotButtons}`,
+    `- Шаг 1 активен на входе: ${step1Active ? 'да' : 'нет'}`,
+    `- Без выбранной программы дальше не пускает: ${blockedWithoutPackage ? 'да' : '**НЕТ**'}`,
+    `- Шаг 2 активируется после выбора программы: ${step2Active ? 'да' : '**НЕТ**'}`,
+    `- Шаг 3 активируется после выбора даты: ${step3Active ? 'да' : '**НЕТ**'}`,
+    `- Без выбранного времени дальше не пускает: ${blockedWithoutSlot ? 'да' : '**НЕТ**'}`,
     `- Сводка после выбора слота: сценарий «${String(summaryValues.quest).trim()}», ` +
       `дата «${String(summaryValues.date).trim()}», время «${String(summaryValues.time).trim()}», ` +
       `состав «${String(summaryValues.guests).trim()}», скрытое поле time=${summaryValues.hiddenTime}, ` +
       `выделено слотов=${summaryValues.selected}`,
     `- Sticky summary: ${summaryPresent ? 'да' : 'нет'}`,
+    `- Sticky summary не перекрывает кнопки: ${
+      !stickyOverlap.card
+        ? 'сводка не найдена'
+        : stickyOverlap.covered === 0
+          ? `да (кнопок проверено: ${stickyOverlap.buttons})`
+          : `**НЕТ** — перекрыто: ${stickyOverlap.coveredText.join(', ')}`
+    }`,
     `- Кнопки «Оплатить» на странице нет: ${noPayButton ? 'да' : 'нет'}`,
     '',
     'Примеры слотов: ' + JSON.parse(slotLabels).join(', '),
