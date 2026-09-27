@@ -43,6 +43,28 @@ const VIEWPORTS = [
 
 const MOBILE_WIDTHS = [320, 360, 375, 390, 430];
 
+/* Сколько минут отводится на весь прогон до принудительной остановки. */
+const WATCHDOG_MINUTES = Number(process.env.QA_WATCHDOG_MINUTES || 4.5);
+
+/*
+ * Наборы проверок. Длинная сессия с браузером живёт на пределе: за десять
+ * минут обхода Chrome начинает падать, и прогон обрывается без объяснений.
+ * Поэтому проверки разделены на два независимых набора, и каждый запускается
+ * отдельно: core — обход, запись и крайние случаи, ui — правила интерфейса,
+ * цена и загрузка.
+ *
+ *   node tests/browser-qa.js --blocks=core
+ *   node tests/browser-qa.js --blocks=ui
+ */
+const BLOCKS = new Set(
+  (process.argv.find((item) => item.startsWith('--blocks=')) || '--blocks=core,ui')
+    .split('=')[1]
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+);
+const wants = (block) => BLOCKS.has(block);
+
 // Текст, которого посетитель видеть не должен. Те же слова, что проверяет
 // внешний чекер: если они попали в публичный HTML, стенд раскрывает технику.
 const FORBIDDEN = [
@@ -115,11 +137,35 @@ function cdp(ws) {
   });
 
   return {
-    send(method, params) {
+    /*
+     * У каждого вызова есть таймаут. Без него смерть браузера превращает
+     * проверку в вечное ожидание ответа, который уже не придёт: скрипт висит
+     * до внешнего лимита, и непонятно, что именно сломалось.
+     */
+    send(method, params, timeoutMs = 20000) {
       const id = nextId++;
       return new Promise((resolve, reject) => {
-        pending.set(id, { resolve, reject });
-        ws.send(JSON.stringify({ id, method, params: params || {} }));
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new Error(`Chrome не ответил на ${method} за ${timeoutMs} мс`));
+        }, timeoutMs);
+        pending.set(id, {
+          resolve(value) {
+            clearTimeout(timer);
+            resolve(value);
+          },
+          reject(error) {
+            clearTimeout(timer);
+            reject(error);
+          }
+        });
+        try {
+          ws.send(JSON.stringify({ id, method, params: params || {} }));
+        } catch (error) {
+          clearTimeout(timer);
+          pending.delete(id);
+          reject(new Error(`Канал к Chrome закрыт: ${error.message}`));
+        }
       });
     },
     on(method, fn) {
@@ -191,7 +237,7 @@ async function viewport(client, width, height, mobile) {
     deviceScaleFactor: 1,
     mobile
   });
-  await sleep(260);
+  await sleep(140);
 }
 
 async function navigate(client, url) {
@@ -211,13 +257,24 @@ async function navigate(client, url) {
 async function scrollThrough(client) {
   await evaluate(
     client,
+    // Внутренний предохранитель: обещание обязано завершиться, даже если
+    // браузер решит притормозить таймеры. Иначе проверка встаёт навсегда.
     `new Promise(function (resolve) {
-      var step = 0;
-      var timer = setInterval(function () {
-        step += 1;
-        window.scrollTo(0, document.body.scrollHeight * (step / 8));
-        if (step >= 8) { clearInterval(timer); window.scrollTo(0, 0); resolve(true); }
-      }, 110);
+      var steps = 6;
+      var done = 0;
+      var guard = setTimeout(function () { window.scrollTo(0, 0); resolve(true); }, 2500);
+      function tick() {
+        done += 1;
+        window.scrollTo(0, document.body.scrollHeight * (done / steps));
+        if (done >= steps) {
+          clearTimeout(guard);
+          window.scrollTo(0, 0);
+          resolve(true);
+          return;
+        }
+        setTimeout(tick, 90);
+      }
+      tick();
     })`,
     true
   );
@@ -297,16 +354,53 @@ async function waitFor(client, expression, timeoutMs = 6000) {
 /* ── Отчёт ──────────────────────────────────────────────────────────────── */
 
 const results = [];
+const report = { lines: [], last: 'старт' };
+
 function record(area, name, ok, detail) {
   results.push({ area, name, ok, detail: detail || '' });
-  const mark = ok ? '✓' : '✗';
-  console.log(`  ${mark} [${area}] ${name}${detail ? ' — ' + detail : ''}`);
+  const line = `${ok ? '✓' : '✗'} [${area}] ${name}${detail ? ' — ' + detail : ''}`;
+  report.lines.push(line);
+  report.last = `[${area}] ${name}`;
+  console.log('  ' + line);
+  writeReport();
+}
+
+/*
+ * Отчёт пишется в файл, а не только в вывод. Вывод перенаправленного процесса
+ * буферизуется, и по нему нельзя понять, где проверка встала. Файл отчёта
+ * дописывается на каждом шаге, поэтому после зависания видно последнюю
+ * выполненную проверку.
+ */
+function writeReport(suffix) {
+  try {
+    const dir = path.join(ROOT, 'tests', 'artifacts', 'qa');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'report.txt'),
+      report.lines.join('\n') + '\n' + (suffix ? '\n' + suffix + '\n' : ''),
+      'utf8'
+    );
+  } catch {
+    /* отчёт — вспомогательный, падать из-за него нельзя */
+  }
 }
 
 /* ── Сценарий ───────────────────────────────────────────────────────────── */
 
 async function run() {
   console.log('\nFANTOM — проверка в браузере\n');
+
+  /*
+   * Сторож. Проверка общается с браузером, а браузер может закрыться посреди
+   * работы: без сторожа скрипт ждёт ответа, которого не будет, и висит до
+   * внешнего лимита — молча, без единой подсказки, что сломалось. Сторож
+   * останавливает прогон и сообщает, на какой проверке он встал.
+   */
+  const watchdog = setTimeout(() => {
+    writeReport(`ПРОВЕРКА ОСТАНОВЛЕНА СТОРОЖЕМ: не завершилась за ${WATCHDOG_MINUTES} мин.`);
+    console.error(`\nПроверка остановлена: превышен лимит времени. Последняя выполненная проверка — ${report.last}\n`);
+    process.exit(1);
+  }, WATCHDOG_MINUTES * 60 * 1000);
 
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fantom-qa-'));
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'fantom-chrome-'));
@@ -359,38 +453,41 @@ async function run() {
     await client.send('Network.enable');
 
     /*
-     * Метрики загрузки собираются со страницы, а не считаются на глаз.
-     * Скрипт ставится до первой навигации: наблюдатели, созданные после
-     * загрузки, пропускают самые ранние сдвиги вёрстки и не увидят LCP.
+     * Наблюдатели метрик ставятся позже — прямо перед замером загрузки.
+     * Наблюдатель, включённый с buffered: true на каждом документе обхода,
+     * заставляет браузер держать его живым на всех десяти страницах, и это
+     * ровно тот лишний груз, из-за которого отзывчивость на первом же шаге
+     * проверки падала до нуля.
      */
-    await client.send('Page.addScriptToEvaluateOnNewDocument', {
-      source: `
-        window.__perf = { lcp: 0, cls: 0, worstShift: 0, sources: [] };
-        try {
-          new PerformanceObserver(function (list) {
-            var entries = list.getEntries();
-            var last = entries[entries.length - 1];
-            if (last) window.__perf.lcp = Math.round(last.startTime);
-          }).observe({ type: 'largest-contentful-paint', buffered: true });
-        } catch (error) {}
-        try {
-          new PerformanceObserver(function (list) {
-            list.getEntries().forEach(function (entry) {
-              if (entry.hadRecentInput) return;
-              window.__perf.cls += entry.value;
-              if (entry.value > window.__perf.worstShift) {
-                window.__perf.worstShift = entry.value;
-                window.__perf.sources = (entry.sources || []).slice(0, 3).map(function (source) {
-                  var node = source.node;
-                  return node ? (node.tagName || '').toLowerCase() + '.' +
-                    String(node.className || '').split(' ').filter(Boolean).join('.') : '?';
-                });
-              }
-            });
-          }).observe({ type: 'layout-shift', buffered: true });
-        } catch (error) {}
-      `
-    });
+    const installPerfObservers = () =>
+      client.send('Page.addScriptToEvaluateOnNewDocument', {
+        source: `
+          window.__perf = { lcp: 0, cls: 0, worstShift: 0, sources: [] };
+          try {
+            new PerformanceObserver(function (list) {
+              var entries = list.getEntries();
+              var last = entries[entries.length - 1];
+              if (last) window.__perf.lcp = Math.round(last.startTime);
+            }).observe({ type: 'largest-contentful-paint', buffered: true });
+          } catch (error) {}
+          try {
+            new PerformanceObserver(function (list) {
+              list.getEntries().forEach(function (entry) {
+                if (entry.hadRecentInput) return;
+                window.__perf.cls += entry.value;
+                if (entry.value > window.__perf.worstShift) {
+                  window.__perf.worstShift = entry.value;
+                  window.__perf.sources = (entry.sources || []).slice(0, 3).map(function (source) {
+                    var node = source.node;
+                    return node ? (node.tagName || '').toLowerCase() + '.' +
+                      String(node.className || '').split(' ').filter(Boolean).join('.') : '?';
+                  });
+                }
+              });
+            }).observe({ type: 'layout-shift', buffered: true });
+          } catch (error) {}
+        `
+      });
 
     const consoleIssues = [];
     const failedRequests = [];
@@ -443,6 +540,7 @@ async function run() {
 
     /* ── 1. Обход всех страниц на двух ширинах ─────────────────────────── */
 
+    if (wants('core')) {
     console.log('  — Обход страниц (375 и 1440) —');
 
     const routeReport = [];
@@ -715,6 +813,8 @@ async function run() {
     const uniqueCovered = [...new Set(covered)];
     record('нажатия', `Интерактивные элементы ничем не перекрыты (проверено ${candidates.length})`,
       uniqueCovered.length === 0, uniqueCovered.slice(0, 6).join('; '));
+
+    }
 
     /* ── 4. Запись на мобильном, как пользователь ──────────────────────── */
 
@@ -1050,6 +1150,7 @@ async function run() {
       `было «${timeBefore}», стало «${timeAfter}»`);
 
     // Отказ API: человеческое сообщение вместо поломки
+    console.log('  — Отказ сети и перезагрузка —');
     blockingApi = true;
     await client.send('Network.setBlockedURLs', { urls: ['*/api/bookings*'] });
     await reachStep(5, { name: 'Отказ Сети', phone: '+7 700 333 22 11', consent: true });
@@ -1077,6 +1178,7 @@ async function run() {
 
     /* ── 6. Цена: одна и та же на всех экранах ─────────────────────────── */
 
+    if (wants('ui')) {
     console.log('\n  — Цена —');
     await viewport(client, 375, 812, true);
     await navigate(client, BASE + '/');
@@ -1213,6 +1315,7 @@ async function run() {
      * загрузку. Один и тот же адрес считается в разных размерах, поэтому
      * без очистки результат меняется от прогона к прогону.
      */
+    await installPerfObservers();
     await client.send('Network.clearBrowserCache');
     await client.send('Network.setCacheDisabled', { cacheDisabled: true });
 
@@ -1268,6 +1371,138 @@ async function run() {
     });
     await client.send('Network.setCacheDisabled', { cacheDisabled: false });
 
+    /* ── Правила веб-интерфейса ────────────────────────────────────────── */
+
+    console.log('\n  — Правила интерфейса —');
+    await viewport(client, 375, 812, true);
+    await navigate(client, BASE + '/booking');
+    await scrollThrough(client);
+
+    const a11y = JSON.parse(
+      await evaluate(
+        client,
+        `(function () {
+          var nodes = Array.prototype.slice.call(
+            document.querySelectorAll('a[href], button, input, select, textarea, summary')
+          );
+          var nameless = [];
+          var unlabelled = [];
+          nodes.forEach(function (el) {
+            var cs = getComputedStyle(el);
+            if (cs.display === 'none' || cs.visibility === 'hidden') return;
+            // Ловушка для ботов и служебные скрытые поля — не часть интерфейса.
+            if (el.closest('[aria-hidden="true"]')) return;
+            if (el.type === 'hidden') return;
+            var r = el.getBoundingClientRect();
+            if (!r.width && !r.height) return;
+
+            var name = (el.getAttribute('aria-label') || '').trim() ||
+              (el.getAttribute('aria-labelledby') ? 'по ссылке' : '') ||
+              (el.textContent || '').trim() ||
+              (el.getAttribute('title') || '');
+            var short = el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') +
+              '.' + String(el.className || '').split(' ').filter(Boolean).slice(0, 1).join('');
+            if (!name) nameless.push(short);
+
+            var isField = el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA';
+            if (isField && !el.getAttribute('aria-label') && !el.getAttribute('aria-labelledby')) {
+              var byFor = el.id ? document.querySelector('label[for="' + el.id + '"]') : null;
+              if (!byFor && !el.closest('label')) unlabelled.push(short);
+            }
+          });
+          return JSON.stringify({ total: nodes.length, nameless: nameless, unlabelled: unlabelled });
+        })()`
+      )
+    );
+
+    record('интерфейс', `У интерактивных элементов есть доступное имя (проверено ${a11y.total})`,
+      a11y.nameless.length === 0, a11y.nameless.slice(0, 5).join(', '));
+    record('интерфейс', 'У каждого поля формы есть связанная подпись',
+      a11y.unlabelled.length === 0, a11y.unlabelled.slice(0, 5).join(', '));
+
+    const preferences = JSON.parse(
+      await evaluate(
+        client,
+        `(function () {
+          var button = document.querySelector('.btn');
+          var heading = document.querySelector('h1') || document.querySelector('h2');
+          var root = getComputedStyle(document.documentElement);
+          var bcs = button ? getComputedStyle(button) : null;
+          var hcs = heading ? getComputedStyle(heading) : null;
+          return JSON.stringify({
+            colorScheme: root.colorScheme,
+            touchAction: bcs ? bcs.touchAction : '—',
+            tapHighlight: bcs ? (bcs.webkitTapHighlightColor || '—') : '—',
+            headingWrap: hcs ? (hcs.textWrap || hcs.textWrapMode || '—') : '—'
+          });
+        })()`
+      )
+    );
+
+    record('интерфейс', 'Страница сообщает браузеру тёмную тему',
+      /dark/.test(preferences.colorScheme), `color-scheme: ${preferences.colorScheme}`);
+    record('интерфейс', 'Касание срабатывает без задержки на двойной тап',
+      preferences.touchAction === 'manipulation', `touch-action: ${preferences.touchAction}`);
+    record('интерфейс', 'Подсветка касания задана, а не системная',
+      preferences.tapHighlight !== '—' && !/rgba?\\(0, 0, 0, 0\\)/.test(preferences.tapHighlight),
+      `-webkit-tap-highlight-color: ${preferences.tapHighlight}`);
+    record('интерфейс', 'Заголовок переносится без висячего слова',
+      /balance/.test(preferences.headingWrap), `text-wrap: ${preferences.headingWrap}`);
+
+    // Клавиатура: каждый шаг табуляции должен давать видимый и доступный фокус
+    const focusProblems = [];
+    let focused = 0;
+    await evaluate(client, `(function(){ window.scrollTo(0, 0); if (document.activeElement) document.activeElement.blur(); return true; })()`);
+    for (let i = 0; i < 12; i += 1) {
+      await client.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 9, key: 'Tab', code: 'Tab' });
+      await client.send('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: 9, key: 'Tab', code: 'Tab' });
+      await sleep(150);
+      const info = JSON.parse(
+        await evaluate(
+          client,
+          `(function () {
+            var el = document.activeElement;
+            if (!el || el === document.body) return JSON.stringify({ tag: 'body' });
+            var cs = getComputedStyle(el);
+            var r = el.getBoundingClientRect();
+            var covered = '';
+            if (r.width && r.height) {
+              var x = Math.min(Math.max(r.left + r.width / 2, 1), window.innerWidth - 1);
+              var y = Math.min(Math.max(r.top + r.height / 2, 1), window.innerHeight - 1);
+              var top = document.elementFromPoint(x, y);
+              if (top && top !== el && !el.contains(top) && !top.contains(el)) {
+                covered = top.tagName.toLowerCase() + '.' + String(top.className || '').split(' ')[0];
+              }
+            }
+            return JSON.stringify({
+              tag: el.tagName.toLowerCase(),
+              cls: String(el.className || '').split(' ')[0],
+              name: (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 24),
+              outline: cs.outlineStyle + ' ' + cs.outlineWidth,
+              ring: cs.boxShadow !== 'none',
+              visible: cs.visibility !== 'hidden' && Number(cs.opacity) > 0.05,
+              covered: covered
+            });
+          })()`
+        )
+      );
+      if (info.tag === 'body') continue;
+      focused += 1;
+      const hasRing = info.ring || /^(solid|dashed|dotted|auto|double) (?!0px)/.test(info.outline);
+      if (!info.visible || !hasRing || info.covered) {
+        focusProblems.push(
+          info.tag + '.' + info.cls + ' «' + info.name + '»' +
+          (!info.visible ? ' невидим' : '') +
+          (!hasRing ? ' без обводки фокуса' : '') +
+          (info.covered ? ' перекрыт ' + info.covered : '')
+        );
+      }
+    }
+    record('интерфейс', `Клавиатурный фокус виден и ничем не перекрыт (проверено ${focused})`,
+      focused >= 5 && focusProblems.length === 0, focusProblems.slice(0, 4).join('; '));
+
+    }
+
     /* ── 8. Ссылки ─────────────────────────────────────────────────────── */
 
     console.log('\n  — Ссылки —');
@@ -1312,6 +1547,8 @@ async function run() {
     record('сеть', 'Ответов 4xx/5xx нет', realNetwork.length === 0, realNetwork.slice(0, 4).join(' | '));
     record('сеть', 'Обрывов загрузки нет', failedRequests.length === 0, failedRequests.slice(0, 4).join(' | '));
   } finally {
+    clearTimeout(watchdog);
+    writeReport();
     if (client) {
       try {
         await client.send('Browser.close');
@@ -1322,8 +1559,15 @@ async function run() {
     if (chrome) chrome.kill();
     server.kill();
     await sleep(300);
-    fs.rmSync(dataDir, { recursive: true, force: true });
-    fs.rmSync(profile, { recursive: true, force: true });
+    // Уборка не должна подменять собой результат: на Windows временный профиль
+    // Chrome иногда ещё занят, и падение при удалении скрыло бы итог проверки.
+    for (const dir of [dataDir, profile]) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* временная папка останется — это не ошибка проверки */
+      }
+    }
   }
 
   const failed = results.filter((item) => !item.ok);

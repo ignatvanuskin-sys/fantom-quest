@@ -36,7 +36,7 @@ function header(settings, path) {
 
   return `<header class="site-header" data-header>
   <div class="wrap header-inner">
-    <a class="brand" href="/" aria-label="FANTOM — на главную">
+    <a class="brand" href="/" aria-label="FANTOM — на главную" translate="no">
       ${brandMark(34)}
       <span class="brand-text">
         <strong>Fantom</strong>

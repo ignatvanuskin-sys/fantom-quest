@@ -233,7 +233,10 @@ html.fx-on .fx-torch.is-live {
     rgba(255, 236, 208, 0.09) 60%,
     transparent 100%
   );
-  animation: fx-sweep 9s linear infinite;
+  /* Полоса проходит четыре раза и останавливается. Это жест «камера
+     включилась», а не вечное движение рядом с текстом: бесконечная
+     анимация на первом экране отвлекает от чтения и греет батарею. */
+  animation: fx-sweep 9s linear 4;
   will-change: transform;
 }
 

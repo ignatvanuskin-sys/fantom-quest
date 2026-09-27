@@ -466,6 +466,22 @@
      * адрес и так известен из телефона. Поле появляется ровно тогда, когда оно
      * нужно, и обязательно только тогда — лишнего человек не заполняет.
      */
+    /*
+     * После неудачной проверки фокус переезжает на первое проблемное поле.
+     * Без этого человек, заполнивший форму с клавиатуры, остаётся в конце
+     * формы и должен сам искать, что именно не так.
+     */
+    function focusFirstError() {
+      var first = form.querySelector('[aria-invalid="true"]');
+      if (!first) return;
+      try {
+        first.focus({ preventScroll: true });
+      } catch (error) {
+        first.focus();
+      }
+      if (first.scrollIntoView) first.scrollIntoView({ block: 'center' });
+    }
+
     function messengerSummary() {
       var label = MESSENGER_LABELS[selectedMessenger()] || MESSENGER_LABELS.whatsapp;
       var nick = nickInput ? nickInput.value.trim() : '';
@@ -815,6 +831,7 @@
         fieldError(consent, 'Нужно согласие на обработку данных.');
         ok = false;
       }
+      if (!ok) focusFirstError();
       return ok;
     }
 

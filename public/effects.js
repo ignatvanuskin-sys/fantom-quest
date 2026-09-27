@@ -128,6 +128,33 @@
 
   /* ── Свет на карточках и магнит для кнопок ────────────────────────────── */
 
+  /*
+   * Кэш прямоугольников. Чтение геометрии на каждое движение мыши заставляет
+   * браузер пересчитывать вёрстку десятки раз в секунду — на телефоне это
+   * заметно как рывки при прокрутке пальцем. Положение элемента меняется
+   * только при прокрутке и изменении окна, поэтому кэш сбрасывается именно
+   * тогда, а не на каждое событие.
+   */
+  var rectCache = new WeakMap();
+  var rectsStale = true;
+
+  function layoutChanged() {
+    rectsStale = true;
+  }
+
+  function rectOf(node) {
+    if (rectsStale) {
+      rectCache = new WeakMap();
+      rectsStale = false;
+    }
+    var rect = rectCache.get(node);
+    if (!rect) {
+      rect = node.getBoundingClientRect();
+      rectCache.set(node, rect);
+    }
+    return rect;
+  }
+
   function initSpotlight() {
     if (!hoverQuery.matches) return;
 
@@ -148,7 +175,7 @@
           'pointermove',
           function (event) {
             if (event.pointerType !== 'mouse') return;
-            var rect = node.getBoundingClientRect();
+            var rect = rectOf(node);
             mx = event.clientX - rect.left;
             my = event.clientY - rect.top;
             if (pending) return;
@@ -183,7 +210,7 @@
           'pointermove',
           function (event) {
             if (event.pointerType !== 'mouse') return;
-            var rect = node.getBoundingClientRect();
+            var rect = rectOf(node);
             dx = Math.max(-limit, Math.min(limit, (event.clientX - (rect.left + rect.width / 2)) * pull));
             dy = Math.max(-limit, Math.min(limit, (event.clientY - (rect.top + rect.height / 2)) * pull));
             if (!node.classList.contains('is-magnet')) node.classList.add('is-magnet');
@@ -370,6 +397,9 @@
     // Свет и курсорные эффекты — только когда движение разрешено и это не
     // экономный режим. Остальное (появление блоков) остаётся.
     if (!motionAllowed() || root.classList.contains('fx-lite')) return;
+
+    window.addEventListener('scroll', layoutChanged, { passive: true });
+    window.addEventListener('resize', layoutChanged, { passive: true });
 
     initInk();
     initTorch();
