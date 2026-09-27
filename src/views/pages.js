@@ -19,13 +19,23 @@ function crumbs(items) {
 function bookingBlock(data, options = {}) {
   return `<section class="section section--booking" id="booking">
   <div class="wrap">
-    ${s.sectionHead({
-      eyebrow: 'Бронирование',
-      title: options.title || 'Выбери дату',
-      lead:
-        options.lead ||
-        'Шесть шагов: программа, дата, время, гости, контакты, проверка. Заявка бесплатная — оплата на месте.'
-    })}
+    ${
+      /*
+       * На отдельной странице записи заголовок секции не нужен: его роль уже
+       * выполняет заголовок страницы, и два заголовка подряд с одинаковым
+       * лидом читаются как повтор. На главной и на странице локации виджет
+       * стоит посреди страницы, там свой заголовок необходим.
+       */
+      options.head === false
+        ? ''
+        : s.sectionHead({
+            eyebrow: 'Бронирование',
+            title: options.title || 'Оформление записи',
+            lead:
+              options.lead ||
+              'Шесть шагов: программа, дата, время, гости, контакты, проверка. Заявка бесплатная — оплата на месте.'
+          })
+    }
     ${s.bookingWizard({
       settings: data.settings,
       packages: data.packages,
@@ -410,7 +420,7 @@ function bookingPage(data) {
       title: 'Запись на игру',
       lead: 'Шесть шагов: программа, дата, время, гости, контакты, проверка. Заявка бесплатная — оплата на месте.'
     })}
-    ${bookingBlock(data)}
+    ${bookingBlock(data, { head: false })}
     <section class="section section--alt">
       <div class="wrap two-col">
         <div class="panel">

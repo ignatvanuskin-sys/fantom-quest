@@ -16,6 +16,7 @@
     "test:kv": "node tests/kv-persistence.js",
     "deploy": "vercel --prod",
     "check:deploy": "node tools/check-deployment.js",
+    "qa:browser": "node tests/browser-qa.js",
     "shots": "node tests/screenshots.js",
     "shots:first-screen": "node tests/screenshots.js --viewport-only --out=tests/artifacts/first-screen",
     "shots:probe": "node tests/screenshots.js --probe=/ --probe-width=390"

@@ -21,7 +21,8 @@ npm run check:deploy -- https://fantom-quest.vercel.app
 
 | Что | Чем подтверждается |
 |---|---|
-| Страницы, разметка, H1, доступность | `npm test` — 63 теста |
+| Страницы, разметка, H1, доступность | `npm test` — 66 тестов |
+| Запись целиком в браузере, крайние случаи, консоль, сеть | `npm run qa:browser` — 32 проверки |
 | Мастер записи, валидация, защита от дублей | тесты, `check:deploy` — идемпотентность, CSRF, `422` без согласия |
 | Вёрстка на 10 ширинах от 320 px | `npm run shots` — 100 замеров, переполнения нет |
 | Постоянное хранилище (драйвер kv) | `npm run test:kv` — два инстанса, одна база |
@@ -102,7 +103,8 @@ node -e "console.log(require('crypto').randomBytes(18).toString('base64url'))"
 ### Vercel
 
 ```bash
-npm test                                  # 63 теста + проверка kv-драйвера
+npm test                                  # 66 тестов + проверка kv-драйвера
+npm run qa:browser                        # 32 проверки в реальном браузере
 git push origin main                      # оба проекта собираются автоматически
 npm run check:deploy -- https://fantom-quest.vercel.app
 ```

@@ -43,7 +43,7 @@ async function get(pathname, options) {
     ['/quests', 'Монахиня'],
     ['/prices', 'Пакет Хоррор'],
     ['/gallery', 'Кадры, снятые внутри'],
-    ['/booking', 'Выбери дату'],
+    ['/booking', 'Ваша бронь'],
     ['/reviews', 'Назерке'],
     ['/faq', 'Сколько длится квест'],
     ['/contacts', 'Назарбаева'],
