@@ -584,7 +584,7 @@ function gallery({ gallery, settings, location, withViewer = true, limit = 0 }) 
       ? `<div class="lightbox" data-lightbox hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии">
     <button class="lightbox-close" type="button" data-lightbox-close aria-label="Закрыть">×</button>
     <button class="lightbox-nav lightbox-nav--prev" type="button" data-lightbox-prev aria-label="Предыдущее фото">‹</button>
-    <figure class="lightbox-figure"><img alt="" data-lightbox-image><figcaption data-lightbox-caption></figcaption></figure>
+    <figure class="lightbox-figure"><img alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-lightbox-image><figcaption data-lightbox-caption></figcaption></figure>
     <button class="lightbox-nav lightbox-nav--next" type="button" data-lightbox-next aria-label="Следующее фото">›</button>
   </div>`
       : ''
