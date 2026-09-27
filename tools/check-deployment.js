@@ -209,6 +209,50 @@ async function get(pathname, options) {
   check('JSON-LD присутствует', ld >= 5, `${ld} блоков`);
   check('нет aggregateRating (рейтинг не наш)', !home.text.includes('aggregateRating'), '');
 
+  /*
+   * Согласованность страниц. Эти проверки появились после второго аудита: на
+   * живом сайте нашлись ссылка на админку в общем футере, разные итоги
+   * занятости на главной и на странице квеста и предзагрузка картинки,
+   * которая скачивала два файла вместо одного. Всё это видно только снаружи.
+   */
+  console.log('\n  — Согласованность страниц —');
+
+  const quests = await get('/quests');
+  const faq = await get('/faq');
+
+  check(
+    'на витрине нет ссылки на админку',
+    !home.text.includes('href="/admin"') && !quests.text.includes('href="/admin"'),
+    home.text.includes('href="/admin"') ? 'ссылка найдена' : ''
+  );
+
+  const ownTotals = ['/', '/quests'].map((pathname, index) => {
+    const page = index === 0 ? home : quests;
+    const match = /Всего свободно (\d+)/.exec(page.text);
+    return { pathname, total: match ? Number(match[1]) : null };
+  });
+  check(
+    'занятость считается одинаково',
+    ownTotals[0].total !== null &&
+      ownTotals[0].total === ownTotals[1].total &&
+      ownTotals[0].total > 0,
+    ownTotals.map((item) => `${item.pathname}: ${item.total}`).join(', ')
+  );
+
+  const preload = /<link rel="preload" as="image"[^>]*>/.exec(home.text);
+  check(
+    'кадр hero предзагружается один раз и адаптивно',
+    Boolean(preload && preload[0].includes('imagesrcset') && preload[0].includes('nun-hood-1440.webp')),
+    preload ? preload[0].slice(0, 70) + '…' : 'нет предзагрузки'
+  );
+  check('на внутренних страницах нет предзагрузки кадра hero', !quests.text.includes('as="image"'), '');
+
+  check(
+    'название локации не обсуждается в публичном FAQ',
+    !faq.text.includes('Как называется локация'),
+    faq.text.includes('Как называется локация') ? 'вопрос опубликован' : ''
+  );
+
   const failed = results.filter((item) => !item.ok);
   console.log('\n' + '─'.repeat(78));
   console.log(`  Проверок: ${results.length}   прошло: ${results.length - failed.length}   провалено: ${failed.length}`);
