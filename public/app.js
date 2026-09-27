@@ -391,7 +391,7 @@
     }
   }
 
-  /* ── Мастер записи: шесть шагов ───────────────────────────────────────── */
+  /* ── Мастер записи: пять шагов ────────────────────────────────────────── */
 
   function initBooking() {
     var form = document.getElementById('booking-form');
@@ -431,7 +431,11 @@
     var guestsInput = form.querySelector('#guests');
     var guestsValue = form.querySelector('[data-guests-value]');
     var confirmList = form.querySelector('[data-confirm]');
+    var nickField = form.querySelector('[data-nick-field]');
+    var nickInput = form.querySelector('#nick');
     var success = document.querySelector('[data-success]');
+
+    var MESSENGER_LABELS = { whatsapp: 'WhatsApp', telegram: 'Telegram', call: 'Звонок' };
 
     var summary = {
       package: document.querySelector('[data-summary-package]'),
@@ -442,6 +446,49 @@
       price: document.querySelector('[data-summary-price]'),
       note: document.querySelector('[data-summary-note]')
     };
+
+    /*
+     * Номера шагов не дублируются числами по коду: гости и контакты — один
+     * шаг, проверка — последний. Если шаги когда-нибудь снова перестроят,
+     * логика переезда и валидации поедет вместе с разметкой, а не оставит
+     * после себя проверку «шаг 5», которая проверяет шаг 4.
+     */
+    var confirmStep = steps.length;
+    var contactsStep = confirmStep - 1;
+
+    function selectedMessenger() {
+      var checked = form.querySelector('input[name="messenger"]:checked');
+      return checked ? checked.value : 'whatsapp';
+    }
+
+    /*
+     * Ник в Telegram спрашиваем только при выборе Telegram: у WhatsApp и звонка
+     * адрес и так известен из телефона. Поле появляется ровно тогда, когда оно
+     * нужно, и обязательно только тогда — лишнего человек не заполняет.
+     */
+    function messengerSummary() {
+      var label = MESSENGER_LABELS[selectedMessenger()] || MESSENGER_LABELS.whatsapp;
+      var nick = nickInput ? nickInput.value.trim() : '';
+      if (selectedMessenger() === 'telegram' && nick) {
+        // Показываем ник в том виде, в каком он будет у администратора:
+        // с ведущей «собачкой», чтобы опечатку было видно сразу.
+        return label + ' · @' + nick.replace(/^@+/, '');
+      }
+      return label;
+    }
+
+    function syncNickField() {
+      if (!nickField || !nickInput) return;
+      var needsNick = selectedMessenger() === 'telegram';
+      nickField.hidden = !needsNick;
+      if (needsNick) nickInput.setAttribute('required', '');
+      else nickInput.removeAttribute('required');
+      nickInput.setAttribute('aria-required', needsNick ? 'true' : 'false');
+      if (!needsNick) {
+        nickInput.value = '';
+        fieldError(nickInput, '');
+      }
+    }
 
     var initialSlot = form.dataset.initialSlot || '';
 
@@ -680,6 +727,11 @@
     if (plus) plus.addEventListener('click', function () { setGuests(state.guests + 1); });
     setGuests(state.guests);
 
+    Array.prototype.slice.call(form.querySelectorAll('input[name="messenger"]')).forEach(function (radio) {
+      radio.addEventListener('change', syncNickField);
+    });
+    syncNickField();
+
     /* Шаг 6. Подтверждение */
     function renderConfirm() {
       if (!confirmList) return;
@@ -691,7 +743,10 @@
         ['Гостей', state.guests + ' чел.'],
         ['Цена', state.packagePrice || 'уточнит администратор'],
         ['Имя', form.querySelector('#name').value || '—'],
-        ['Телефон', form.querySelector('#phone').value || '—']
+        ['Телефон', form.querySelector('#phone').value || '—'],
+        // Канал связи показываем на проверке: человек видит, куда ему напишут,
+        // и может вернуться, если выбрал не то.
+        ['Связь', messengerSummary()]
       ];
       confirmList.innerHTML = rows
         .map(function (row) {
@@ -737,7 +792,7 @@
       return true;
     }
 
-    function validateStep5() {
+    function validateContacts() {
       clearErrors(form);
       var ok = true;
       var name = form.querySelector('#name');
@@ -750,6 +805,10 @@
       }
       if (String(phone.value).replace(/\D/g, '').length < 11) {
         fieldError(phone, 'Телефон в формате +7 700 000 00 00.');
+        ok = false;
+      }
+      if (selectedMessenger() === 'telegram' && nickInput && nickInput.value.trim().length < 4) {
+        fieldError(nickInput, 'Напишите ник в Telegram — иначе мы не сможем вам ответить.');
         ok = false;
       }
       if (!consent.checked) {
@@ -767,8 +826,8 @@
         if (state.step === 1 && !validateStep1()) return;
         if (state.step === 2 && !validateStep2()) return;
         if (state.step === 3 && !validateStep3()) return;
-        if (state.step === 5 && !validateStep5()) return;
-        if (target === 6) renderConfirm();
+        if (state.step === contactsStep && !validateContacts()) return;
+        if (target === confirmStep) renderConfirm();
         showStep(target);
         track('booking_step', { step: target });
       }
@@ -783,8 +842,8 @@
         showStep(3);
         return;
       }
-      if (!validateStep5()) {
-        showStep(5);
+      if (!validateContacts()) {
+        showStep(contactsStep);
         return;
       }
 
@@ -802,7 +861,8 @@
         guests: state.guests,
         name: form.querySelector('#name').value,
         phone: form.querySelector('#phone').value,
-        messenger: (form.querySelector('input[name="messenger"]:checked') || {}).value || 'whatsapp',
+        messenger: selectedMessenger(),
+        messengerNick: selectedMessenger() === 'telegram' && nickInput ? nickInput.value.trim() : '',
         comment: form.querySelector('#comment').value,
         consent: form.querySelector('#consent').checked,
         source: 'website',

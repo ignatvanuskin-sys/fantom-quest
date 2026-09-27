@@ -251,7 +251,15 @@
             '<div><span>Гостей</span><br>' + esc(booking.guests) + '</div>' +
             '<div><span>Имя</span><br>' + esc(booking.name) + '</div>' +
             '<div><span>Телефон</span><br><a href="tel:' + esc(booking.phone) + '">' + esc(booking.phone) + '</a></div>' +
-            '<div><span>Канал</span><br>' + esc(booking.messengerLabel || booking.messenger) + '</div>' +
+            // Ник — ссылкой: администратору нужен один клик до чата,
+            // а не поиск человека по нику вручную.
+            '<div><span>Канал</span><br>' + esc(booking.messengerLabel || booking.messenger) +
+            (booking.messengerNick
+              ? '<br><a target="_blank" rel="noopener" href="https://t.me/' +
+                esc(String(booking.messengerNick).replace(/^@/, '')) + '">' +
+                esc(booking.messengerNick) + '</a>'
+              : '') +
+            '</div>' +
             '<div><span>Создана</span><br>' + esc(String(booking.createdAt).slice(0, 16).replace('T', ' ')) + '</div>' +
             (booking.comment ? '<div><span>Комментарий</span><br>«' + esc(booking.comment) + '»</div>' : '') +
             '</div>' +

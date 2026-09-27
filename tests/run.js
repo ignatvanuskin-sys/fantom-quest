@@ -858,6 +858,51 @@ async function run() {
     );
   });
 
+  await test('Канал связи: ник в Telegram спрашивают и нормализуют', async () => {
+    ratelimit.reset();
+    const date = futureDate(18);
+    const availability = await get('/api/availability?date=' + date);
+    const open = availability.json.slots.filter((slot) => slot.available);
+    assert.ok(open.length >= 3, 'для проверки нужно три свободных слота, свободно: ' + open.length);
+
+    // Telegram без ника — отказ с объяснением, а не молчаливая отправка
+    const missing = await postJson(
+      '/api/bookings',
+      validBooking({ date, time: open[0].time, messenger: 'telegram', messengerNick: '' })
+    );
+    assert.strictEqual(missing.status, 422, 'ожидался 422, получен ' + missing.status);
+    assert.ok(missing.json.errors.messengerNick, 'нет объяснения про ник: ' + JSON.stringify(missing.json.errors));
+
+    // Ник без «собачки» приводится к одному виду
+    const created = await postJson(
+      '/api/bookings',
+      validBooking({ date, time: open[1].time, messenger: 'telegram', messengerNick: 'Fantom_Uka' })
+    );
+    assert.strictEqual(created.status, 201, 'ожидался 201, получен ' + created.status);
+    assert.strictEqual(created.json.booking.messengerNick, '@Fantom_Uka');
+
+    // Мусор вместо ника отклоняется
+    const bad = await postJson(
+      '/api/bookings',
+      validBooking({ date, time: open[2].time, messenger: 'telegram', messengerNick: 'плохой ник' })
+    );
+    assert.strictEqual(bad.status, 422, 'некорректный ник должен отклоняться');
+  });
+
+  await test('Канал связи: для WhatsApp ник не спрашивают и не хранят', async () => {
+    ratelimit.reset();
+    const date = futureDate(19);
+    const availability = await get('/api/availability?date=' + date);
+    const open = availability.json.slots.filter((slot) => slot.available);
+    assert.ok(open.length >= 1, 'нужен свободный слот');
+    const created = await postJson(
+      '/api/bookings',
+      validBooking({ date, time: open[0].time, messenger: 'whatsapp', messengerNick: '@Fantom_Uka' })
+    );
+    assert.strictEqual(created.status, 201);
+    assert.strictEqual(created.json.booking.messengerNick, '', 'ник не должен сохраняться для WhatsApp');
+  });
+
   await test('Форма записи: labels, aria, touch-target, honeypot', async () => {
     const page = await get('/booking');
     for (const needle of ['aria-label="Программа"', 'for="phone"', 'for="name"', 'aria-live', 'role="radiogroup"', 'autocomplete="tel"', 'aria-required']) {

@@ -32,7 +32,9 @@ function bookingMessage(booking, siteUrl) {
     '',
     `Имя: ${booking.name}`,
     `Телефон: ${booking.phone}`,
-    `Связь: ${booking.messengerLabel}`,
+    // Ник показываем рядом с каналом: администратору нужно, куда именно писать,
+    // а не только каким приложением.
+    `Связь: ${booking.messengerLabel}${booking.messengerNick ? ' · ' + booking.messengerNick : ''}`,
     booking.comment ? `Комментарий: ${booking.comment}` : null,
     '',
     `Цена: уточняется у администратора`,

@@ -838,7 +838,7 @@ function beforeYouGo({ settings, location, quest }) {
 /* ── МАСТЕР ЗАПИСИ ──────────────────────────────────────────────────────── */
 
 /**
- * Запись: шесть шагов вместо трёх — пакет, дата, время, гости, контакты,
+ * Запись: пять шагов — пакет, дата, время, гости и контакты,
  * подтверждение. Все решения видны в сводке, сервер всё перепроверяет.
  */
 function bookingWizard({ settings, packages, days, quest, initialPackage, initialDate, preselectedSlot }) {
@@ -866,7 +866,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
         data-phone="${esc(settings.phone)}">
 
     <ol class="wizard-progress" data-progress>
-      ${['Пакет', 'Дата', 'Время', 'Гости', 'Контакты', 'Проверка']
+      ${['Пакет', 'Дата', 'Время', 'Гости и контакты', 'Проверка']
         .map(
           (label, index) =>
             `<li class="${index === 0 ? 'is-active' : ''}" data-progress-step="${index + 1}"><span>${index + 1}</span>${esc(label)}</li>`
@@ -875,7 +875,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
     </ol>
 
     <fieldset class="fx-corners fx-corners--hot wizard-step is-active" data-step="1">
-      <legend class="wizard-legend">Шаг 1 из 6. Выберите программу</legend>
+      <legend class="wizard-legend">Шаг 1 из 5. Выберите программу</legend>
       <div class="package-picker" role="radiogroup" aria-label="Программа">
         ${bookable
           .map(
@@ -902,7 +902,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
     </fieldset>
 
     <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="2">
-      <legend class="wizard-legend">Шаг 2 из 6. Выберите дату</legend>
+      <legend class="wizard-legend">Шаг 2 из 5. Выберите дату</legend>
       <div class="date-strip" data-date-strip role="radiogroup" aria-label="Игровой день">
         ${days
           .slice(0, 21)
@@ -926,7 +926,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
     </fieldset>
 
     <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="3">
-      <legend class="wizard-legend">Шаг 3 из 6. Выберите время</legend>
+      <legend class="wizard-legend">Шаг 3 из 5. Выберите время</legend>
       <p class="wizard-hint" data-slot-day></p>
       <div class="slot-picker" role="radiogroup" aria-label="Свободное время" data-slot-picker>
         <p class="slot-hint">Загружаем свободные слоты…</p>
@@ -935,31 +935,28 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       <input type="hidden" name="time" id="time" required>
       <div class="wizard-nav">
         <button class="btn btn-ghost" type="button" data-back="2">Назад</button>
-        <button class="btn btn-blood" type="button" data-next="4" data-requires-slot>Дальше: гости</button>
+        <button class="btn btn-blood" type="button" data-next="4" data-requires-slot>Дальше: гости и контакты</button>
       </div>
     </fieldset>
 
     <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="4">
-      <legend class="wizard-legend">Шаг 4 из 6. Сколько вас будет</legend>
-      <div class="stepper" role="group" aria-label="Количество игроков">
-        <button class="stepper-btn" type="button" data-guests-minus aria-label="Меньше">−</button>
-        <span class="stepper-value" data-guests-value aria-live="polite">${esc(String(baseGuests))}</span>
-        <button class="stepper-btn" type="button" data-guests-plus aria-label="Больше">+</button>
-      </div>
-      <input type="hidden" name="guests" id="guests" value="${esc(String(baseGuests))}">
-      <p class="wizard-hint" data-guests-hint>
-        В стоимость выбранной программы включено ${esc(String(baseGuests))}
-        ${plural(baseGuests, 'человек', 'человека', 'человек')}. Число игроков можно менять: доплата за
-        каждого следующего указана в карточке программы и в прайс-листе локации.
-      </p>
-      <div class="wizard-nav">
-        <button class="btn btn-ghost" type="button" data-back="3">Назад</button>
-        <button class="btn btn-blood" type="button" data-next="5">Дальше: контакты</button>
-      </div>
-    </fieldset>
+      <legend class="wizard-legend">Шаг 4 из 5. Гости и контакты</legend>
 
-    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="5">
-      <legend class="wizard-legend">Шаг 5 из 6. Контакты</legend>
+      <div class="field">
+        <span class="field-label" id="guests-label">Сколько вас будет</span>
+        <div class="stepper" role="group" aria-labelledby="guests-label">
+          <button class="stepper-btn" type="button" data-guests-minus aria-label="Меньше">−</button>
+          <span class="stepper-value" data-guests-value aria-live="polite">${esc(String(baseGuests))}</span>
+          <button class="stepper-btn" type="button" data-guests-plus aria-label="Больше">+</button>
+        </div>
+        <input type="hidden" name="guests" id="guests" value="${esc(String(baseGuests))}">
+        <p class="field-hint" data-guests-hint>
+          В стоимость программы включено ${esc(String(baseGuests))}
+          ${plural(baseGuests, 'человек', 'человека', 'человек')}. Доплата за каждого следующего указана
+          в карточке программы и в прайс-листе локации.
+        </p>
+      </div>
+
       <div class="field">
         <label for="name">Имя</label>
         <input id="name" name="name" type="text" autocomplete="name" maxlength="80" required aria-required="true" aria-describedby="name-hint">
@@ -979,6 +976,14 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
           <label class="radio"><input type="radio" name="messenger" value="call"><span>Звонок</span></label>
         </div>
       </div>
+      <div class="field" data-nick-field hidden>
+        <label for="nick">Ник в Telegram</label>
+        <input id="nick" name="nick" type="text" maxlength="33" autocomplete="off" autocapitalize="none"
+               spellcheck="false" placeholder="@username" aria-describedby="nick-hint">
+        <p class="field-hint" id="nick-hint">
+          Напишем сюда. Ник начинается с @ — свой видно в настройках профиля Telegram.
+        </p>
+      </div>
       <div class="field">
         <label for="comment">Комментарий <span class="optional">необязательно</span></label>
         <textarea id="comment" name="comment" rows="3" maxlength="600"
@@ -989,24 +994,26 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
           <input type="checkbox" id="consent" name="consent" required aria-required="true" aria-describedby="consent-hint">
           <span>Согласен на обработку персональных данных по <a href="/privacy" target="_blank" rel="noopener">политике</a>.</span>
         </label>
-        <p class="field-hint" id="consent-hint">Храним имя, телефон и комментарий. Больше ничего не запрашиваем.</p>
+        <p class="field-hint" id="consent-hint">
+          Храним имя, телефон, комментарий и ник в мессенджере, если вы его указали. Больше ничего не запрашиваем.
+        </p>
       </div>
       <div class="hp-field" aria-hidden="true">
         <label for="website">Не заполняйте это поле</label>
         <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
       </div>
       <div class="wizard-nav">
-        <button class="btn btn-ghost" type="button" data-back="4">Назад</button>
-        <button class="btn btn-blood" type="button" data-next="6" data-requires-contacts>Дальше: проверить</button>
+        <button class="btn btn-ghost" type="button" data-back="3">Назад</button>
+        <button class="btn btn-blood" type="button" data-next="5" data-requires-contacts>Дальше: проверить</button>
       </div>
     </fieldset>
 
-    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="6">
-      <legend class="wizard-legend">Шаг 6 из 6. Проверьте и подтвердите</legend>
+    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="5">
+      <legend class="wizard-legend">Шаг 5 из 5. Проверьте и подтвердите</legend>
       <dl class="confirm-list" data-confirm></dl>
       <p class="wizard-error" data-form-error role="alert" aria-live="assertive" hidden></p>
       <div class="wizard-nav">
-        <button class="btn btn-ghost" type="button" data-back="5">Назад</button>
+        <button class="btn btn-ghost" type="button" data-back="4">Назад</button>
         <button class="btn btn-blood btn-xl" type="submit" data-submit>Забронировать</button>
       </div>
       <p class="wizard-hint">

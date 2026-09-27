@@ -106,6 +106,24 @@ function validateBooking(payload, options = {}) {
     errors.messenger = 'Выберите удобный канал связи: WhatsApp, Telegram или звонок.';
   }
 
+  /*
+   * Ник в Telegram. Спрашиваем его только при выборе Telegram: у WhatsApp и
+   * звонка адрес известен из номера телефона, и требовать ник там значило бы
+   * просить лишнее. Храним с ведущей «собачкой», чтобы администратор видел
+   * готовую ссылку, а не догадывался о формате.
+   */
+  value.messengerNick = '';
+  if (value.messenger === 'telegram') {
+    const nick = cleanString(payload.messengerNick, 40).replace(/^@+/, '').trim();
+    if (!nick) {
+      errors.messengerNick = 'Напишите ник в Telegram — иначе мы не сможем вам ответить.';
+    } else if (!/^[A-Za-z0-9_]{4,32}$/.test(nick)) {
+      errors.messengerNick = 'Ник в Telegram: латинские буквы, цифры и подчёркивание, от 4 до 32 знаков.';
+    } else {
+      value.messengerNick = '@' + nick;
+    }
+  }
+
   value.comment = cleanString(payload.comment, config.form.maxCommentLength);
 
   const consent = payload.consent === true || payload.consent === 'true' || payload.consent === 'on';

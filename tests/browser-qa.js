@@ -224,6 +224,16 @@ async function scrollThrough(client) {
   await sleep(400);
 }
 
+/* Снимок текущего кадра: нужен там, где проверка глазами важнее числа —
+   например чтобы посмотреть, как выглядит появившееся поле ника. */
+async function shot(client, name) {
+  const dir = path.join(ROOT, 'tests', 'artifacts', 'qa');
+  fs.mkdirSync(dir, { recursive: true });
+  const { data } = await client.send('Page.captureScreenshot', { format: 'jpeg', quality: 82 });
+  fs.writeFileSync(path.join(dir, name + '.jpg'), Buffer.from(data, 'base64'));
+  return path.join('tests/artifacts/qa', name + '.jpg');
+}
+
 const click = (client, selector) =>
   evaluate(
     client,
@@ -747,21 +757,20 @@ async function run() {
       record('запись', 'шаги 1–3 пройдены, слоты загрузились', true, '');
       await click(client, '.slot-btn[data-slot]');
       await sleep(300);
+      // Шаг 4 — «Гости и контакты»: число игроков и данные для связи на одном экране.
       await click(client, '[data-next="4"]');
       await sleep(320);
 
       await click(client, '[data-guests-plus]');
       await sleep(200);
       const guests = await text(client, '[data-summary-guests]');
-      await click(client, '[data-next="5"]');
-      await sleep(320);
 
       await fill(client, '#name', 'Проверка Браузер');
       await fill(client, '#phone', '+7 700 555 44 33');
       await sleep(200);
       const consentOk = await click(client, '#consent');
       await sleep(200);
-      await click(client, '[data-next="6"]');
+      await click(client, '[data-next="5"]');
       await sleep(360);
 
       const summary = JSON.parse(
@@ -818,6 +827,105 @@ async function run() {
       record('запись', 'на отправку ушёл один POST', posts.length - before === 1, `POST: ${posts.length - before}`);
     }
 
+    /* ── Канал связи и ник в Telegram ──────────────────────────────────── */
+
+    console.log('\n  — Канал связи и ник в Telegram —');
+
+    await viewport(client, 375, 812, true);
+    await navigate(client, BASE + '/booking');
+
+    const wizardShape = JSON.parse(
+      await evaluate(
+        client,
+        `JSON.stringify({
+          steps: document.querySelectorAll('.wizard-step').length,
+          progress: document.querySelectorAll('[data-progress-step]').length,
+          guestsOnContacts: Boolean(document.querySelector('[data-step="4"] [data-guests-plus]'))
+        })`
+      )
+    );
+    record('запись', 'в мастере пять шагов, гости на шаге контактов',
+      wizardShape.steps === 5 && wizardShape.progress === 5 && wizardShape.guestsOnContacts === true,
+      `шагов ${wizardShape.steps}, пунктов прогресса ${wizardShape.progress}, счётчик гостей на шаге контактов: ${wizardShape.guestsOnContacts}`);
+
+    await click(client, '.package-option[data-package]');
+    await sleep(240);
+    await click(client, '[data-next="2"]');
+    await sleep(240);
+    await click(client, '[data-date]');
+    await sleep(240);
+    await click(client, '[data-next="3"]');
+    await waitFor(client, `Boolean(document.querySelector('.slot-btn[data-slot]'))`, 8000);
+    await click(client, '.slot-btn[data-slot]');
+    await sleep(200);
+    await click(client, '[data-next="4"]');
+    await sleep(320);
+
+    const nickHiddenForWhatsapp = await evaluate(client, `document.querySelector('[data-nick-field]').hidden`);
+    record('канал связи', 'при WhatsApp поле ника скрыто', nickHiddenForWhatsapp === true,
+      `hidden=${nickHiddenForWhatsapp}`);
+
+    await pickMessenger('telegram');
+    const nickInfo = JSON.parse(
+      await evaluate(
+        client,
+        `(function () {
+          var field = document.querySelector('[data-nick-field]');
+          var input = document.querySelector('#nick');
+          return JSON.stringify({
+            hidden: field.hidden,
+            required: input.hasAttribute('required'),
+            label: (field.querySelector('label') || {}).textContent
+          });
+        })()`
+      )
+    );
+    record('канал связи', 'при выборе Telegram появляется поле ника',
+      nickInfo.hidden === false && nickInfo.required === true,
+      `скрыто=${nickInfo.hidden}, обязательно=${nickInfo.required}, подпись «${(nickInfo.label || '').trim()}»`);
+    await shot(client, 'booking-step-contacts-telegram-375');
+
+    // Пустой ник не должен пускать дальше
+    await sleep(3400);
+    await fill(client, '#name', 'Телеграм Проверка');
+    await fill(client, '#phone', '+7 700 222 33 44');
+    await click(client, '#consent');
+    await sleep(200);
+    const postsBeforeNick = posts.length;
+    await click(client, '[data-next="5"]');
+    await sleep(900);
+    const nickError = await fieldText(client);
+    record('канал связи', 'без ника дальше не пускает и объясняет почему',
+      posts.length === postsBeforeNick && /ник|telegram/i.test(nickError || ''),
+      `«${nickError || '— пусто'}»`);
+
+    // Ник в свободной форме: «Fantom_Uka» и «@Fantom_Uka» — одно и то же
+    await fill(client, '#nick', 'Fantom_Uka');
+    await sleep(200);
+    await click(client, '[data-next="5"]');
+    await sleep(420);
+    const confirmText = await text(client, '[data-confirm]');
+    record('канал связи', 'ник виден на шаге проверки',
+      /@Fantom_Uka/i.test(confirmText || ''),
+      `${(confirmText || '').replace(/\s+/g, ' ').slice(0, 96)}`);
+
+    // Возврат на WhatsApp: поле скрывается и значение не остаётся в форме
+    await click(client, '[data-back="4"]');
+    await sleep(320);
+    await pickMessenger('whatsapp');
+    const switched = JSON.parse(
+      await evaluate(
+        client,
+        `JSON.stringify({
+          hidden: document.querySelector('[data-nick-field]').hidden,
+          value: document.querySelector('#nick').value
+        })`
+      )
+    );
+    record('канал связи', 'возврат на WhatsApp прячет поле и очищает ник',
+      switched.hidden === true && switched.value === '',
+      `скрыто=${switched.hidden}, значение «${switched.value}»`);
+
     /* ── 5. Крайние случаи ─────────────────────────────────────────────── */
 
     console.log('\n  — Крайние случаи —');
@@ -841,19 +949,35 @@ async function run() {
       await click(client, '[data-next="4"]');
       await sleep(240);
       if (target <= 4) return;
-      await click(client, '[data-next="5"]');
-      await sleep(240);
-      if (target <= 5) return;
       // Сервер не принимает заявку, отправленную быстрее трёх секунд после
       // открытия формы: это защита от ботов. Проверка обязана её уважать,
       // а не обходить, иначе получает 422 и делает неверный вывод.
       await sleep(3400);
       await fill(client, '#name', opts.name || 'Проверка Крайняя');
       await fill(client, '#phone', opts.phone || '+7 700 111 22 33');
+      if (opts.messenger) await pickMessenger(opts.messenger, opts.nick);
       if (opts.consent) await click(client, '#consent');
       await sleep(200);
-      await click(client, '[data-next="6"]');
+      await click(client, '[data-next="5"]');
       await sleep(320);
+    }
+
+    /* Переключение канала связи так, как это делает человек: выбираем радио
+       и, если нужно, вписываем ник. */
+    async function pickMessenger(value, nick) {
+      await evaluate(
+        client,
+        `(function () {
+          var radio = document.querySelector('input[name="messenger"][value="' + ${JSON.stringify(value)} + '"]');
+          if (!radio) return false;
+          radio.click();
+          radio.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        })()`
+      );
+      await sleep(220);
+      if (nick) await fill(client, '#nick', nick);
+      await sleep(160);
     }
 
     // Согласие не проставлено: заявка уходить не должна
@@ -928,27 +1052,7 @@ async function run() {
     // Отказ API: человеческое сообщение вместо поломки
     blockingApi = true;
     await client.send('Network.setBlockedURLs', { urls: ['*/api/bookings*'] });
-    await navigate(client, BASE + '/booking');
-    await click(client, '.package-option[data-package]');
-    await sleep(220);
-    await click(client, '[data-next="2"]');
-    await sleep(220);
-    await click(client, '[data-date]');
-    await sleep(220);
-    await click(client, '[data-next="3"]');
-    await waitFor(client, `Boolean(document.querySelector('.slot-btn[data-slot]'))`, 8000);
-    await click(client, '.slot-btn[data-slot]');
-    await sleep(200);
-    await click(client, '[data-next="4"]');
-    await sleep(220);
-    await click(client, '[data-next="5"]');
-    await sleep(220);
-    await fill(client, '#name', 'Отказ Сети');
-    await fill(client, '#phone', '+7 700 333 22 11');
-    await click(client, '#consent');
-    await sleep(200);
-    await click(client, '[data-next="6"]');
-    await sleep(300);
+    await reachStep(5, { name: 'Отказ Сети', phone: '+7 700 333 22 11', consent: true });
     await click(client, '[data-submit]');
     await sleep(2500);
     const networkError = await text(client, '[data-form-error]');
@@ -1081,7 +1185,9 @@ async function run() {
                 return item.name.split('/').pop().slice(0, 52) + ' ' + Math.round(size(item) / 1024) + 'КБ';
               }),
             images: images.map(function (item) { return item.name.split('/').pop(); }),
-            heaviest: heaviest ? heaviest.name.split('/').pop() + ' ' + Math.round(size(heaviest) / 1024) + 'КБ' : '—'
+            heaviest: heaviest ? heaviest.name.split('/').pop() + ' ' + Math.round(size(heaviest) / 1024) + 'КБ' : '—',
+            heaviestImage: heaviest ? heaviest.name.split('/').pop() : '',
+            heaviestImageKb: heaviest ? Math.round(size(heaviest) / 1024) : 0
           });
         })()`
       )
@@ -1100,6 +1206,15 @@ async function run() {
       uploadThroughput: (3 * 1024 * 1024) / 8,
       connectionType: 'cellular4g'
     });
+
+    /*
+     * Кэш очищаем: иначе браузер отдаёт ресурсы из памяти, и замер показывает
+     * то, что уже лежало в кэше от предыдущих переходов, а не реальную
+     * загрузку. Один и тот же адрес считается в разных размерах, поэтому
+     * без очистки результат меняется от прогона к прогону.
+     */
+    await client.send('Network.clearBrowserCache');
+    await client.send('Network.setCacheDisabled', { cacheDisabled: true });
 
     await viewport(client, 375, 812, true);
     await navigate(client, BASE + '/');
@@ -1135,14 +1250,9 @@ async function run() {
       criticalPath > 0 && criticalPath < 307200,
       `${Math.round(criticalPath / 1024)} КБ; разбивка: ${byType}`);
 
-    const largestImage = firstScreen.top
-      .map((line) => {
-        const match = line.match(/(\d+)КБ$/);
-        return match ? Number(match[1]) : 0;
-      })
-      .reduce((max, value) => Math.max(max, value), 0);
-    record('загрузка', 'Ни один кадр не тяжелее 250 КБ', largestImage > 0 && largestImage <= 250,
-      `тяжелейшие: ${firstScreen.top.join(', ')}`);
+    record('загрузка', 'Ни один кадр не тяжелее 250 КБ',
+      firstScreen.heaviestImageKb > 0 && firstScreen.heaviestImageKb <= 250,
+      `тяжелейший кадр: ${firstScreen.heaviestImage || '—'} ${firstScreen.heaviestImageKb} КБ`);
 
     await scrollThrough(client);
     await sleep(900);
@@ -1156,6 +1266,7 @@ async function run() {
       downloadThroughput: -1,
       uploadThroughput: -1
     });
+    await client.send('Network.setCacheDisabled', { cacheDisabled: false });
 
     /* ── 8. Ссылки ─────────────────────────────────────────────────────── */
 
