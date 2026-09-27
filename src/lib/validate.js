@@ -74,8 +74,8 @@ function validateBooking(payload, options = {}) {
   const errors = {};
   const value = {};
 
-  value.questId = cleanString(payload.questId, 80);
-  if (!value.questId) errors.questId = 'Выберите сценарий.';
+  value.packageId = cleanString(payload.packageId, 80);
+  if (!value.packageId) errors.packageId = 'Выберите пакет.';
 
   value.date = cleanString(payload.date, 10);
   if (!value.date) errors.date = 'Выберите дату.';

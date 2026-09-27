@@ -115,9 +115,14 @@ function forDate(data, businessDate, options = {}) {
     };
   });
 
+  const openCount = slots.filter((slot) => slot.available).length;
+
   return {
     businessDate,
     dateLabel: time.formatDateRu(businessDate),
+    // label и availableCount — то, что читают шаблоны и мастер записи.
+    label: time.formatDateRu(businessDate),
+    availableCount: openCount,
     weekday: time.weekdayShortRu(businessDate),
     timezone: tz,
     shift: { start: hours.shiftStart, end: hours.shiftEnd },
@@ -125,7 +130,7 @@ function forDate(data, businessDate, options = {}) {
     questId,
     isPast: window.end.getTime() < now.getTime(),
     slots,
-    openCount: slots.filter((s) => s.available).length
+    openCount
   };
 }
 

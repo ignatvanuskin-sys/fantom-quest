@@ -12,6 +12,7 @@
  */
 
 const crypto = require('crypto');
+const config = require('../config');
 const store = require('../store');
 const audit = require('../lib/audit');
 const time = require('../lib/time');
@@ -72,12 +73,39 @@ async function create(payload, context = {}) {
     });
   }
   const input = validation.value;
+  const idempotencyKey = context.idempotencyKey || null;
+
+  // Идемпотентность: повторный клик по «Забронировать» не должен создавать
+  // вторую заявку. Ищем такую же по ключу за окно дедупликации.
+  if (idempotencyKey) {
+    const existing = (await store.read()).bookings.find(
+      (booking) =>
+        booking.idempotencyKey === idempotencyKey &&
+        Date.now() - Date.parse(booking.createdAt) < config.idempotencyWindowMs
+    );
+    if (existing) {
+      await audit.append('booking.duplicate_submit', { reference: existing.reference }, context.req || null);
+      return {
+        booking: existing,
+        duplicate: true,
+        notification: { mockMode: config.mockMode, demoMode: config.demoMode, channels: [], manual: { whatsappLink: null } }
+      };
+    }
+  }
 
   const result = await store.transaction(async (data) => {
-    const quest = availability.questById(data, input.questId);
-    if (!quest || !quest.active || quest.bookingEnabled === false) {
-      throw new BookingError('quest_unavailable', 'Этот сценарий сейчас недоступен для онлайн-записи.', 409);
+    const pkg = (data.packages || []).find((item) => item.id === input.packageId);
+    if (!pkg) {
+      throw new BookingError('package_not_found', 'Такого пакета нет. Выберите пакет из списка.', 409);
     }
+    if (!pkg.confirmed) {
+      throw new BookingError(
+        'package_unavailable',
+        'Этот пакет ещё не подтверждён владельцем, поэтому онлайн-запись по нему закрыта. Напишите в WhatsApp.',
+        409
+      );
+    }
+    const quest = availability.questById(data, pkg.questId || (data.quests[0] || {}).id);
 
     const slotCheck = availability.validateRequestedSlot(data, input.date, input.time, {
       questId: quest.id,
@@ -106,9 +134,13 @@ async function create(payload, context = {}) {
     const booking = {
       id: newId('bk'),
       reference: newReference(),
+      packageId: pkg.id,
+      packageName: pkg.name,
+      packageDuration: pkg.durationLabel || null,
+      packagePriceLabel: pkg.priceLabel || null,
       questId: quest.id,
       questName: quest.name,
-      locationId: quest.locationId,
+      locationId: quest.locationId || (data.locations[0] || {}).id,
       date: input.date,
       businessDate: input.date,
       startTime: input.time,
@@ -128,6 +160,7 @@ async function create(payload, context = {}) {
       source: input.source || 'website',
       userAgent: context.userAgent ? String(context.userAgent).slice(0, 180) : null,
       consentAt: nowIso,
+      idempotencyKey,
       status: 'new',
       createdAt: nowIso,
       updatedAt: nowIso,
@@ -141,6 +174,8 @@ async function create(payload, context = {}) {
     return booking;
   });
 
+  if (result.duplicate) return result;
+
   // Уведомление вне транзакции: сеть не должна держать мьютекс хранилища.
   let notification;
   try {
@@ -152,6 +187,7 @@ async function create(payload, context = {}) {
 
   await audit.append('booking.created', {
     reference: result.reference,
+    packageId: result.packageId,
     questId: result.questId,
     businessDate: result.businessDate,
     startTime: result.startTime,
@@ -281,6 +317,10 @@ async function get(id) {
 function publicView(booking) {
   return {
     reference: booking.reference,
+    packageId: booking.packageId,
+    packageName: booking.packageName,
+    packageDuration: booking.packageDuration,
+    packagePriceLabel: booking.packagePriceLabel,
     questName: booking.questName,
     date: booking.businessDate,
     businessDate: booking.businessDate,

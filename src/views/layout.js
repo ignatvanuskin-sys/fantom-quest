@@ -4,11 +4,10 @@ const config = require('../config');
 const { esc, escJson } = require('../lib/validate');
 
 const NAV = [
-  { href: '/quests', label: 'Квесты' },
-  { href: '/how-it-works', label: 'Как это работает' },
-  { href: '/safety', label: 'Безопасность' },
+  { href: '/quests', label: 'Квест' },
+  { href: '/prices', label: 'Пакеты' },
+  { href: '/gallery', label: 'Галерея' },
   { href: '/reviews', label: 'Отзывы' },
-  { href: '/faq', label: 'FAQ' },
   { href: '/contacts', label: 'Контакты' }
 ];
 
@@ -16,20 +15,31 @@ function abs(pathname) {
   return config.siteUrl + (pathname.startsWith('/') ? pathname : '/' + pathname);
 }
 
-function header(settings, currentPath) {
-  const phoneHref = 'tel:' + settings.phoneE164;
+/** Упрощённый знак FANTOM: круг, рога и крылья — по мотивам вывески. */
+function brandMark(size = 30) {
+  return `<svg class="brand-mark" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true" focusable="false">
+  <circle cx="24" cy="24" r="21.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity="0.55"/>
+  <path d="M14 15.5c2.6.6 4.4 2.3 5.3 4.6M34 15.5c-2.6.6-4.4 2.3-5.3 4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+  <path d="M24 17.6c4.6 0 7.6 3.1 7.6 7.4 0 3-1.5 5.4-3.7 6.7l1.4 3.3-2.9-1.5h-4.8l-2.9 1.5 1.4-3.3c-2.2-1.3-3.7-3.7-3.7-6.7 0-4.3 3-7.4 7.6-7.4z" fill="currentColor" fill-opacity="0.9"/>
+  <circle cx="21.2" cy="24.6" r="1.5" fill="#08090a"/>
+  <circle cx="26.8" cy="24.6" r="1.5" fill="#08090a"/>
+  <path d="M8 32.5c3.4 3.3 6.2 5 8.4 5.2M40 32.5c-3.4 3.3-6.2 5-8.4 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.7"/>
+</svg>`;
+}
+
+function header(settings, path) {
   const nav = NAV.map(
     (item) =>
-      `<a href="${esc(item.href)}"${currentPath === item.href ? ' aria-current="page"' : ''}>${esc(item.label)}</a>`
+      `<a href="${esc(item.href)}"${path === item.href ? ' aria-current="page"' : ''}>${esc(item.label)}</a>`
   ).join('');
 
-  return `<header class="site-header" id="top">
+  return `<header class="site-header" data-header>
   <div class="wrap header-inner">
-    <a class="brand" href="/" aria-label="Fantom — на главную">
-      <span class="brand-mark" aria-hidden="true">${brandMarkSvg()}</span>
+    <a class="brand" href="/" aria-label="FANTOM — на главную">
+      ${brandMark(34)}
       <span class="brand-text">
         <strong>Fantom</strong>
-        <small>Усть-Каменогорск</small>
+        <small>${esc(settings.city)}</small>
       </span>
     </a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
@@ -38,122 +48,136 @@ function header(settings, currentPath) {
     </button>
     <nav class="site-nav" id="site-nav" aria-label="Основная навигация">${nav}</nav>
     <div class="header-actions">
-      <a class="phone-link" href="${esc(phoneHref)}">
-        <span class="phone-label">Телефон</span>
-        <span class="phone-value">${esc(settings.phone)}</span>
+      <a class="header-phone" href="tel:${esc(settings.phoneE164)}">
+        <span class="header-phone-label">Телефон</span>
+        <span class="header-phone-value">${esc(settings.phone)}</span>
       </a>
-      <a class="btn btn-primary" href="/booking">Выбрать дату и время</a>
+      <a class="btn btn-blood" href="/booking">Забронировать</a>
     </div>
   </div>
-  ${mockBanner()}
+  ${stageBanner()}
 </header>`;
 }
 
-function brandMarkSvg() {
-  return `<svg viewBox="0 0 32 32" width="32" height="32" role="img" aria-hidden="true" focusable="false">
-    <rect x="1" y="1" width="30" height="30" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/>
-    <path d="M8 24V8h12v3.4h-8.2v3.1h6.6v3.4h-6.6V24z" fill="currentColor"/>
-    <circle cx="24.5" cy="24.5" r="2.5" fill="var(--red)"/>
-  </svg>`;
-}
-
 /**
- * Плашка честности. Два независимых предупреждения:
- *  - demoMode — у стенда нет постоянного хранилища (например, деплой на Vercel
- *    без подключённого KV): заявки не переживут перезапуск инстанса;
- *  - MOCK_MODE — заявки не уходят реальному бизнесу.
- * Показываем их, пока оба условия сняты не будут.
+ * Плашка честности. Показывается, пока стенд не готов принимать реальные
+ * заявки: либо нет постоянного хранилища (demoMode), либо включён MOCK_MODE.
  */
-function mockBanner() {
+function stageBanner() {
   const parts = [];
   if (config.demoMode) {
     parts.push(
-      '<b>Демонстрационный стенд.</b> Постоянное хранилище не подключено: заявки не сохраняются ' +
-        'и не отправляются бизнесу. Для реальной брони используйте WhatsApp.'
+      '<b>Демонстрационный стенд.</b> Постоянное хранилище не подключено: заявка не сохранится и не дойдёт до администратора. Для реальной брони напишите в WhatsApp.'
     );
   }
   if (config.mockMode) {
-    parts.push(
-      'Тестовый режим <code>MOCK_MODE</code>: заявки не уходят реальному бизнесу.'
-    );
+    parts.push('Режим <code>MOCK_MODE</code>: уведомления администратору не отправляются.');
   }
   if (!parts.length) return '';
-
-  return `<div class="mock-banner${config.demoMode ? ' mock-banner--demo' : ''}" role="status">
-    <div class="wrap">
-      <strong>${config.demoMode ? 'Демо-режим' : 'Тестовый режим'}</strong>
-      <span>${parts.join(' ')}</span>
-    </div>
+  return `<div class="stage-banner${config.demoMode ? ' stage-banner--demo' : ''}" role="status">
+    <div class="wrap"><strong>${config.demoMode ? 'Демо' : 'Тест'}</strong> ${parts.join(' ')}</div>
   </div>`;
 }
 
 function footer(settings, location) {
   return `<footer class="site-footer">
   <div class="wrap footer-grid">
-    <div>
+    <div class="footer-brand-col">
       <p class="footer-brand">${esc(settings.brand.displayName)}</p>
-      <p class="footer-note">${
-        location
-          ? esc(location.fullAddress)
-          : esc(settings.city)
-      }</p>
+      <p class="footer-tagline">${esc(settings.brand.tagline)}</p>
+      <p class="footer-note">${esc(settings.brand.legalName)}</p>
+      <p class="footer-note">${esc(location.fullAddress)}</p>
       <p class="footer-note">${esc(settings.hours.label)}</p>
     </div>
     <div>
       <p class="footer-title">Запись</p>
-      <p><a href="/booking">Выбрать дату и время</a></p>
-      <p><a href="${esc(settings.whatsappUrl)}" rel="noopener">Спросить в WhatsApp</a></p>
+      <p><a href="/booking">Выбрать время</a></p>
+      <p><a href="/prices">Пакеты и цены</a></p>
       <p><a href="tel:${esc(settings.phoneE164)}">${esc(settings.phone)}</a></p>
+      <p><a href="${esc(settings.whatsappUrl)}" rel="noopener">WhatsApp</a></p>
     </div>
     <div>
-      <p class="footer-title">Информация</p>
-      <p><a href="/safety">Безопасность и правила</a></p>
+      <p class="footer-title">О квесте</p>
+      <p><a href="/quests">Сценарий и режимы</a></p>
+      <p><a href="/gallery">Галерея</a></p>
+      <p><a href="/reviews">Отзывы</a></p>
       <p><a href="/faq">Частые вопросы</a></p>
-      <p><a href="/privacy">Политика обработки данных</a></p>
-      <p><a href="/contacts">Контакты и как добраться</a></p>
     </div>
     <div>
-      <p class="footer-title">Источники фактов</p>
-      <p><a href="${esc(settings.instagramUrl)}" rel="noopener">Instagram @_fantom_uka_</a></p>
-      <p><a href="${esc(settings.rating.sourceUrl)}" rel="noopener">Карточка 2ГИС</a></p>
-      <p class="footer-note">Рейтинг и количество отзывов — динамические данные, обновлено ${esc(
-        settings.rating.updatedAt
-      )}.</p>
+      <p class="footer-title">Связь</p>
+      <p><a href="${esc(settings.instagramUrl)}" rel="noopener">${esc(settings.instagramHandle)}</a></p>
+      <p><a href="${esc(location.galleryUrl)}" rel="noopener">Фото в 2ГИС</a></p>
+      <p><a href="${esc(location.routeUrl)}" rel="noopener">Маршрут в 2ГИС</a></p>
+      <p><a href="/privacy">Обработка данных</a></p>
     </div>
   </div>
   <div class="wrap footer-bottom">
-    <span>Прототип сайта. Перед публикацией владелец подтверждает цены, сценарии, правила, возраст и канал обработки заявок.</span>
+    <span>
+      Рейтинг и отзывы — динамические данные 2ГИС, обновлено ${esc(settings.rating.updatedAt)}.
+      Непроверенные сведения помечены на сайте как «уточняется».
+    </span>
     <a href="/admin">Админка</a>
   </div>
 </footer>
-${soundToggle()}`;
+${soundControl()}
+${contactBar(settings)}`;
 }
 
-function soundToggle() {
-  return `<button class="sound-toggle" type="button" data-sound-toggle aria-pressed="false" hidden>
-  <span class="sound-icon" aria-hidden="true"></span>
-  <span class="sound-text" data-sound-text>Звук выключен</span>
+/** Звук: выключен по умолчанию, включается только явным нажатием. */
+function soundControl() {
+  return `<button class="sound-control" type="button" data-sound-toggle aria-pressed="false" hidden>
+  <span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+  <span class="sound-label" data-sound-label>Звук выключен</span>
 </button>`;
 }
 
 /**
+ * Компактная панель контактов на мобильном.
+ * Не перекрывает контент: одна строка, учитывает safe-area, скрывается
+ * при прокрутке вниз и при открытой клавиатуре (см. app.js).
+ */
+function contactBar(settings) {
+  return `<div class="contact-bar" data-contact-bar>
+  <a class="contact-bar-btn contact-bar-btn--ghost" href="tel:${esc(settings.phoneE164)}">
+    <span aria-hidden="true">☏</span><span>Позвонить</span>
+  </a>
+  <a class="contact-bar-btn contact-bar-btn--wa" href="${esc(settings.whatsappUrl)}" rel="noopener">
+    <span aria-hidden="true">✆</span><span>WhatsApp</span>
+  </a>
+  <a class="contact-bar-btn contact-bar-btn--blood" href="/booking">Забронировать</a>
+</div>`;
+}
+
+/**
  * @param {object} options
- * @param {string} options.title       — <title>
- * @param {string} options.description — meta description
- * @param {string} options.path        — canonical path
- * @param {string} options.body        — HTML контента
+ * @param {string} options.title
+ * @param {string} options.description
+ * @param {string} options.path
+ * @param {string} options.body
  * @param {object} options.settings
- * @param {object|null} options.location
- * @param {Array} options.jsonLd       — массив JSON-LD объектов
- * @param {string} [options.ogType]
+ * @param {object} options.location
+ * @param {Array}  options.jsonLd
+ * @param {string} [options.ogImage]
  * @param {string} [options.bodyClass]
  * @param {boolean} [options.noindex]
+ * @param {string} [options.ogType]
  */
 function page(options) {
-  const { title, description, path, body, settings, location, jsonLd = [], ogType = 'website', bodyClass = '', noindex = false } = options;
-  const canonical = abs(path);
-  const ogImage = abs('/og.png');
+  const {
+    title,
+    description,
+    path,
+    body,
+    settings,
+    location,
+    jsonLd = [],
+    ogImage = abs('/images/og/og-fantom.jpg'),
+    bodyClass = '',
+    noindex = false,
+    ogType = 'website'
+  } = options;
 
+  const canonical = abs(path);
   const ld = jsonLd
     .filter(Boolean)
     .map((item) => `<script type="application/ld+json">${escJson(item)}</script>`)
@@ -163,21 +187,25 @@ function page(options) {
 <html lang="ru">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>${esc(title)}</title>
     <meta name="description" content="${esc(description)}">
     <link rel="canonical" href="${esc(canonical)}">
     ${noindex ? '<meta name="robots" content="noindex, nofollow">' : '<meta name="robots" content="index, follow, max-image-preview:large">'}
-    <meta name="theme-color" content="#08090a">
+    <meta name="theme-color" content="#050505">
     <meta name="format-detection" content="telephone=yes">
+    <meta name="geo.region" content="KZ-VOS">
+    <meta name="geo.placename" content="Усть-Каменогорск">
     <meta property="og:type" content="${esc(ogType)}">
-    <meta property="og:site_name" content="Fantom">
+    <meta property="og:site_name" content="FANTOM">
     <meta property="og:locale" content="ru_RU">
     <meta property="og:title" content="${esc(title)}">
     <meta property="og:description" content="${esc(description)}">
     <meta property="og:url" content="${esc(canonical)}">
     <meta property="og:image" content="${esc(ogImage)}">
-    <meta property="og:image:alt" content="Fantom — хоррор-квест в Усть-Каменогорске">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="FANTOM — хоррор-квест в Усть-Каменогорске">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${esc(title)}">
     <meta name="twitter:description" content="${esc(description)}">
@@ -185,6 +213,7 @@ function page(options) {
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/favicon.svg">
     <link rel="manifest" href="/site.webmanifest">
+    <link rel="preload" as="image" href="/images/quests/nun-hood-900.webp" fetchpriority="high">
     <link rel="stylesheet" href="/styles.css">
     ${ld}
   </head>
@@ -200,4 +229,4 @@ ${body}
 </html>`;
 }
 
-module.exports = { page, abs, NAV };
+module.exports = { page, abs, NAV, brandMark };

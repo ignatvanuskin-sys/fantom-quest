@@ -1,168 +1,144 @@
 'use strict';
 
 /**
- * Серверный рендер страниц: данные → HTML.
+ * Серверный рендер: данные → HTML с метаданными.
  * Метаданные (title, description, canonical, OG, JSON-LD) собираются на сервере,
- * а не в браузере — это требование брифа и обязательное условие для индексации.
+ * а не в браузере — это обязательное условие для индексации и превью ссылок.
  */
 
 const config = require('./config');
 const store = require('./store');
 const time = require('./lib/time');
 const availability = require('./services/availability');
-const home = require('./views/pages-home');
-const questPages = require('./views/pages-quests');
-const infoPages = require('./views/pages-info');
+const pages = require('./views/pages');
 
-async function ctx() {
+const HORIZON = config.booking.horizonDays;
+
+async function context(query = {}) {
   const data = await store.read();
   const settings = data.settings;
-  const location = data.locations[0] || null;
-  const quests = data.quests;
-  const primaryQuest = quests.find((q) => q.isPrimary) || quests[0] || null;
-  const days = availability.upcoming(data, { days: 14 });
-  const nextSlot = availability.nextOpenSlot(data);
-  return { data, settings, location, quests, primaryQuest, days, nextSlot };
-}
+  const location = data.locations[0];
+  const quest = data.quests.find((item) => item.isPrimary) || data.quests[0];
 
-async function renderHome() {
-  const c = await ctx();
-  return home.home({
-    settings: c.settings,
-    location: c.location,
-    quests: c.quests,
-    faq: c.data.faq.sort((a, b) => a.order - b.order),
-    reviews: c.data.reviews.sort((a, b) => a.order - b.order),
-    nextSlot: c.nextSlot,
-    days: c.days,
-    mockMode: config.mockMode
-  });
-}
+  const requestedDate = time.isValidDate(query.date) ? query.date : '';
+  const days = availability
+    .upcoming(data, { days: 14, from: requestedDate || undefined, questId: quest.id })
+    .map((day) => ({
+      businessDate: day.businessDate,
+      label: time.formatDateRu(day.businessDate),
+      weekday: day.weekday,
+      slots: day.slots,
+      availableCount: day.slots.filter((slot) => slot.status === 'open').length
+    }));
 
-async function renderQuests() {
-  const c = await ctx();
-  return questPages.quests({
-    settings: c.settings,
-    location: c.location,
-    quests: c.quests,
-    nextSlot: c.nextSlot
-  });
-}
+  const bookableDays = availability
+    .upcoming(data, { days: HORIZON, from: requestedDate || undefined, questId: quest.id })
+    .map((day) => ({
+      businessDate: day.businessDate,
+      label: time.formatDateRu(day.businessDate),
+      weekday: day.weekday,
+      slots: day.slots,
+      availableCount: day.slots.filter((slot) => slot.status === 'open').length
+    }));
 
-async function renderQuest(slug) {
-  const c = await ctx();
-  const quest = c.quests.find((q) => q.slug === slug || q.id === slug);
-  if (!quest) return null;
-  if (quest.isPlaceholder) {
-    // Заготовка сценария не имеет отдельной страницы — ведём в каталог.
-    return null;
-  }
-  const days = availability.upcoming(c.data, { days: 10, questId: quest.id });
-  const nextSlot = availability.nextOpenSlot(c.data, { questId: quest.id });
-  return questPages.questDetail({
-    settings: c.settings,
-    location: c.location,
+  return {
+    data,
+    settings,
+    location,
     quest,
-    quests: c.quests,
-    nextSlot,
-    days
-  });
+    packages: data.packages.filter((item) => item.active !== false),
+    addons: data.addons,
+    kinoLand: data.kinoLand,
+    gallery: data.gallery,
+    pricePhotos: data.pricePhotos,
+    reviews: data.reviews,
+    faq: data.faq.slice().sort((a, b) => a.order - b.order),
+    content: data.content,
+    days,
+    bookableDays
+  };
 }
 
-async function renderBooking(query) {
-  const c = await ctx();
-  const bookable = c.quests.filter((q) => q.active && q.bookingEnabled !== false);
-  const requestedQuest = query.quest
-    ? bookable.find((q) => q.slug === query.quest || q.id === query.quest)
+async function renderHome(query = {}) {
+  const c = await context(query);
+  return pages.home({ ...c, days: c.bookableDays });
+}
+
+async function renderQuests(query = {}) {
+  const c = await context(query);
+  return pages.questPage(c);
+}
+
+async function renderPrices(query = {}) {
+  const c = await context(query);
+  return pages.pricesPage({ ...c, days: c.bookableDays });
+}
+
+async function renderGallery(query = {}) {
+  const c = await context(query);
+  return pages.galleryPage(c);
+}
+
+async function renderReviews(query = {}) {
+  const c = await context(query);
+  return pages.reviewsPage(c);
+}
+
+async function renderFaq(query = {}) {
+  const c = await context(query);
+  return pages.faqPage(c);
+}
+
+async function renderContacts(query = {}) {
+  const c = await context(query);
+  return pages.contactsPage(c);
+}
+
+/** Запись. Дата и слот могут прийти ссылкой с карточки пакета или дня. */
+async function renderBooking(query = {}) {
+  const c = await context(query);
+  const requestedPackage = query.package
+    ? c.packages.find((item) => item.id === query.package && item.confirmed)
     : null;
-  const initialQuest = (requestedQuest || bookable[0] || {}).id || '';
-  const initialDate = time.isValidDate(query.date) ? query.date : '';
-  const days = availability.upcoming(c.data, {
-    days: config.booking.horizonDays,
-    questId: initialQuest,
-    from: initialDate || undefined
-  });
+  const initialDate = time.isValidDate(query.date) ? query.date : c.bookableDays[0].businessDate;
+  const days = c.bookableDays.slice(
+    Math.max(0, c.bookableDays.findIndex((day) => day.businessDate === initialDate))
+  );
 
-  return questPages.booking({
-    settings: c.settings,
-    location: c.location,
-    quests: c.quests,
-    initialQuest,
-    initialDate: initialDate || (days[0] ? days[0].businessDate : ''),
-    preselectedSlot: time.isValidTime(query.time) ? query.time : '',
-    days
+  return pages.bookingPage({
+    ...c,
+    days: days.length ? days : c.bookableDays,
+    initialPackage: requestedPackage ? requestedPackage.id : '',
+    initialDate,
+    preselectedSlot: time.isValidTime(query.time) ? query.time : ''
   });
 }
 
-async function renderHowItWorks() {
-  const c = await ctx();
-  return infoPages.howItWorks({
-    settings: c.settings,
-    location: c.location,
-    quest: c.primaryQuest,
-    days: c.days
-  });
+async function renderBookingStatus(query = {}) {
+  const c = await context(query);
+  return pages.bookingStatusPage(c);
 }
 
-async function renderSafety() {
-  const c = await ctx();
-  return infoPages.safety({ settings: c.settings, location: c.location, quest: c.primaryQuest });
+async function renderPrivacy(query = {}) {
+  const c = await context(query);
+  return pages.privacyPage(c);
 }
 
-async function renderReviews() {
-  const c = await ctx();
-  const reviews = c.data.reviews.sort((a, b) => a.order - b.order);
-  const published = reviews.filter((r) => r.verified && r.text);
-  return infoPages.reviews({
-    settings: c.settings,
-    location: c.location,
-    reviews,
-    published,
-    pendingCount: reviews.length - published.length
-  });
-}
-
-async function renderFaq() {
-  const c = await ctx();
-  return infoPages.faqPageView({
-    settings: c.settings,
-    location: c.location,
-    faq: c.data.faq.sort((a, b) => a.order - b.order)
-  });
-}
-
-async function renderContacts() {
-  const c = await ctx();
-  return infoPages.contacts({ settings: c.settings, location: c.location, quest: c.primaryQuest });
-}
-
-async function renderPrivacy() {
-  const c = await ctx();
-  return infoPages.privacy({ settings: c.settings, location: c.location });
-}
-
-async function renderBookingStatus() {
-  const c = await ctx();
-  return infoPages.bookingStatus({ settings: c.settings, location: c.location });
-}
-
-async function renderNotFound() {
-  const c = await ctx();
-  return infoPages.notFound({ settings: c.settings, location: c.location });
+async function renderNotFound(query = {}) {
+  const c = await context(query);
+  return pages.notFoundPage(c);
 }
 
 async function renderSitemap() {
-  const c = await ctx();
-  const tz = c.settings.timezone;
-  const today = time.todayIn(tz);
+  const c = await context();
+  const today = time.todayIn(c.settings.timezone);
   const paths = [
     { path: '/', priority: '1.0', changefreq: 'weekly' },
     { path: '/quests', priority: '0.9', changefreq: 'weekly' },
-    { path: `/quests/${c.primaryQuest.slug}`, priority: '0.9', changefreq: 'weekly' },
+    { path: '/prices', priority: '0.9', changefreq: 'weekly' },
     { path: '/booking', priority: '0.9', changefreq: 'weekly' },
-    { path: '/how-it-works', priority: '0.6', changefreq: 'monthly' },
-    { path: '/safety', priority: '0.6', changefreq: 'monthly' },
-    { path: '/reviews', priority: '0.6', changefreq: 'weekly' },
+    { path: '/gallery', priority: '0.7', changefreq: 'weekly' },
+    { path: '/reviews', priority: '0.7', changefreq: 'weekly' },
     { path: '/faq', priority: '0.6', changefreq: 'monthly' },
     { path: '/contacts', priority: '0.7', changefreq: 'monthly' }
   ];
@@ -194,17 +170,17 @@ Sitemap: ${config.siteUrl}/sitemap.xml
 }
 
 module.exports = {
+  context,
   renderHome,
   renderQuests,
-  renderQuest,
-  renderBooking,
-  renderHowItWorks,
-  renderSafety,
+  renderPrices,
+  renderGallery,
   renderReviews,
   renderFaq,
   renderContacts,
-  renderPrivacy,
+  renderBooking,
   renderBookingStatus,
+  renderPrivacy,
   renderNotFound,
   renderSitemap,
   renderRobots

@@ -1,12 +1,15 @@
-# Не загружаем на Vercel то, что не нужно в рантайме.
+# Что не загружаем на Vercel: в рантайме это не нужно.
 # public/ и src/ обязаны остаться — они попадают в бандл функции
 # через includeFiles в vercel.json.
 data/
 tests/artifacts/
+research/
+.research/
 media-output/
 .vercel/
 node_modules/
 .env
 .env.local
+.admin-token.txt
 *.log
 *.tmp

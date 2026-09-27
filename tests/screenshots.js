@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 /**
  * Скриншоты и замеры вёрстки через Chrome DevTools Protocol.
@@ -47,11 +47,10 @@ const CHROME_CANDIDATES = [
 
 const PAGES = [
   { name: 'home', url: '/', title: 'Главная' },
-  { name: 'quests', url: '/quests', title: 'Каталог' },
-  { name: 'quest', url: '/quests/zaklyatiya-proklyatiya-monahini', title: 'Сценарий' },
+  { name: 'quest', url: '/quests', title: 'Квест' },
+  { name: 'gallery', url: '/gallery', title: 'Галерея' },
+  { name: 'prices', url: '/prices', title: 'Пакеты' },
   { name: 'booking', url: '/booking', title: 'Запись' },
-  { name: 'how-it-works', url: '/how-it-works', title: 'Как проходит' },
-  { name: 'safety', url: '/safety', title: 'Безопасность' },
   { name: 'reviews', url: '/reviews', title: 'Отзывы' },
   { name: 'faq', url: '/faq', title: 'FAQ' },
   { name: 'contacts', url: '/contacts', title: 'Контакты' },
@@ -74,7 +73,7 @@ const VIEWPORTS = [
  * плюс несколько контрольных крайних ширин. Замеры переполнения выполняются
  * для всех комбинаций — это дешево.
  */
-const SHOT_PAGES = ['home', 'quest', 'booking', 'contacts', 'admin', 'faq', 'reviews', 'safety'];
+const SHOT_PAGES = ['home', 'quest', 'prices', 'booking', 'contacts', 'admin', 'faq', 'reviews', 'gallery'];
 const SHOT_VIEWPORTS = ['mobile-390', 'desktop-1440'];
 const EXTRA_SHOTS = [
   ['home', 'mobile-360'],
@@ -177,7 +176,12 @@ async function evaluate(client, expression, awaitPromise = false) {
     awaitPromise
   });
   if (result.exceptionDetails) {
-    throw new Error(result.exceptionDetails.text || 'Ошибка выполнения в браузере');
+    const details = result.exceptionDetails;
+    const description = (details.exception && (details.exception.description || details.exception.value)) || '';
+    throw new Error(
+      `Ошибка выполнения в браузере: ${details.text || ''} ${description}`.trim() +
+        ` | выражение: ${String(expression).replace(/\s+/g, ' ').slice(0, 140)}`
+    );
   }
   return result.result.value;
 }
@@ -213,6 +217,11 @@ async function capture(client, width, height, file) {
   await sleep(500);
   // JPEG вместо PNG: полностраничный кадр 390×12000 в PNG весит ~4 МБ,
   // в JPEG при качестве 82 — около 600 КБ, при том же читаемом результате.
+  // Возвращаемся в начало страницы: после смены размеров вьюпорта браузер
+  // сохраняет прежний скролл, и «первый экран» на самом деле снимался ниже.
+  await evaluate(client, 'window.scrollTo(0, 0)');
+  await sleep(350);
+
   const shot = await client.send('Page.captureScreenshot', {
     format: 'jpeg',
     quality: 82,
@@ -241,7 +250,7 @@ async function probe(client) {
     `JSON.stringify({
       scrollY: window.scrollY,
       viewport: [window.innerWidth, window.innerHeight],
-      nodes: ['.mock-banner', 'header.site-header', '.eyebrow', 'h1', '.hero-copy', '.site-nav']
+      nodes: ['.stage-banner', '.hero-inner', 'h1', '.hero-title-brand', '.hero-title-brand .brand-mark', '.hero-title-line', '.hero-facts', '.hero-actions']
         .map(function (sel) {
           var el = document.querySelector(sel);
           if (!el) return { sel: sel, missing: true };
@@ -413,7 +422,7 @@ async function run() {
   await client.once('Page.loadEventFired').catch(() => null);
   await sleep(1200);
 
-  const mockBanner = await evaluate(client, `!!document.querySelector('.mock-banner')`);
+  const mockBanner = await evaluate(client, `!!document.querySelector('.stage-banner')`);
   const heroCta = await evaluate(
     client,
     `JSON.stringify([...document.querySelectorAll('.hero .btn')].map(function (b) { return b.textContent.trim(); }))`
@@ -475,18 +484,18 @@ async function run() {
     await evaluate(
       client,
       `JSON.stringify({
-        quest: (document.querySelector('[data-summary-quest]') || {}).textContent,
+        quest: (document.querySelector('[data-summary-package]') || {}).textContent,
         date: (document.querySelector('[data-summary-date]') || {}).textContent,
         time: (document.querySelector('[data-summary-time]') || {}).textContent,
         guests: (document.querySelector('[data-summary-guests]') || {}).textContent,
         hiddenTime: document.getElementById('time').value,
-        selected: document.querySelectorAll('.slot-btn.is-selected').length
+        selected: document.querySelectorAll('.slot-btn[aria-checked="true"]').length
       })`
     )
   );
   await capture(client, 390, 1700, path.join(OUT, 'booking-step2-mobile-390.jpg'));
 
-  const summaryPresent = await evaluate(client, `!!document.querySelector('[data-sticky-summary]')`);
+  const summaryPresent = await evaluate(client, `!!document.querySelector('.summary-card')`);
   const noPayButton = await evaluate(
     client,
     `![...document.querySelectorAll('button, a')].some(function (el) { return /оплатить|оплата заказа/i.test(el.textContent); })`
@@ -507,7 +516,7 @@ async function run() {
     noPaymentButton: noPayButton
   };
 
-  console.log(`  плашка MOCK_MODE видна:            ${mockBanner ? 'да' : 'нет'}`);
+  console.log(`  плашка режима стенда видна:            ${mockBanner ? 'да' : 'нет'}`);
   console.log(`  CTA в hero:                        ${ctaLabels.join(' | ')}`);
   console.log(`  меню до клика:                     display=${navHiddenBefore}`);
   console.log(`  меню после клика:                  display=${nav.display}, aria-expanded=${nav.expanded}, ссылок=${nav.links}`);
@@ -589,5 +598,6 @@ async function run() {
 
 run().catch((error) => {
   console.error('Скрипт упал:', error.message);
+  if (process.env.VERBOSE) console.error(error.stack);
   process.exit(1);
 });

@@ -1,16 +1,19 @@
 node_modules/
 .vercel
+
+# Данные и секреты
 data/db.json
 data/*.tmp
 data/audit.log.jsonl
 .env
 .env.local
-.DS_Store
-Thumbs.db
-tests/artifacts/
-media-output/
-*.log
-
-.vercel
 .env*
 .admin-token.txt
+
+# Артефакты проверок и черновая работа
+tests/artifacts/
+media-output/
+.research/
+*.log
+.DS_Store
+Thumbs.db

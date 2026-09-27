@@ -81,7 +81,12 @@ const config = {
   // допустим только на локальной машине. На развёрнутом стенде админка
   // полностью закрывается, пока владелец не задаст свой ADMIN_TOKEN.
   adminLoginDisabled:
-    isVercel && (!str(env.ADMIN_TOKEN) || str(env.ADMIN_TOKEN) === 'dev-admin-token-change-me'),
+    isVercel &&
+    !str(env.ADMIN_PASSWORD) &&
+    (!str(env.ADMIN_TOKEN) || str(env.ADMIN_TOKEN) === 'dev-admin-token-change-me'),
+
+  // Идемпотентность заявок: сколько помним ключи повторных отправок.
+  idempotencyWindowMs: int(env.IDEMPOTENCY_WINDOW_MINUTES, 120) * 60 * 1000,
   storeDriver,
   kv: kvConfigured ? { url: kvUrl, token: kvToken } : null,
   persistentStorage,
@@ -94,7 +99,12 @@ const config = {
   siteUrl,
   timezone: env.SITE_TIMEZONE || 'Asia/Almaty',
 
+  // Админка: основной способ входа — пароль (ADMIN_PASSWORD) с подписанной
+  // сессионной кукой. ADMIN_TOKEN оставлен для совместимости и как API-ключ.
   adminToken: str(env.ADMIN_TOKEN) || 'dev-admin-token-change-me',
+  adminPassword: str(env.ADMIN_PASSWORD),
+  adminSessionSecret: str(env.ADMIN_SESSION_SECRET),
+  adminSessionTtlMs: int(env.ADMIN_SESSION_TTL_HOURS, 12) * 3600 * 1000,
   isDefaultAdminToken: !str(env.ADMIN_TOKEN) || str(env.ADMIN_TOKEN) === 'dev-admin-token-change-me',
 
   // Стенд без постоянного хранилища обязан молчать: заявка не сохранена,

@@ -1,0 +1,949 @@
+{
+ "source": "https://2gis.kz/ust-kamenogorsk/gallery/firm/70000001112974709",
+ "scrapedAt": "2026-09-27",
+ "count": 62,
+ "albums": [
+  {
+   "id": "all",
+   "name": "Все",
+   "count": 62
+  },
+  {
+   "id": "video",
+   "name": "Видео",
+   "count": 17
+  },
+  {
+   "id": "entrance",
+   "name": "Вход",
+   "count": 1
+  },
+  {
+   "id": "price_list_image",
+   "name": "Цены",
+   "count": 1
+  },
+  {
+   "id": "owner",
+   "name": "От владельца",
+   "count": 33
+  },
+  {
+   "id": "user",
+   "name": "От пользователей",
+   "count": 28
+  }
+ ],
+ "photoCount": 45,
+ "videoCount": 17,
+ "photos": [
+  {
+   "id": "30258560307627342",
+   "url": "https://i7.photo.2gis.com/photo-gallery/d5fa6835-40b5-4492-9daa-c0de05eba790.jpg",
+   "alt": "Фотография от пользователя",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560326965675",
+   "url": "https://i8.photo.2gis.com/photo-gallery/3b0a5744-1c35-46ac-a33b-31f33aea74f6.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560326965492",
+   "url": "https://i6.photo.2gis.com/photo-gallery/b60b7710-eb41-49eb-adce-4582155745eb.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560330553630",
+   "url": "https://i6.photo.2gis.com/photo-gallery/3666eb6c-a297-4671-8fbe-f3cb4fb75561.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560336490405",
+   "url": "https://i1.photo.2gis.com/photo-gallery/23bacca0-d2fa-4e7a-b4d6-7985508915a3.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560338226077",
+   "url": "https://i3.photo.2gis.com/photo-gallery/d638fd58-3b13-4c08-9aa3-25597b2bfcf9.jpg",
+   "alt": "Фотография от владельца",
+   "width": 4032,
+   "height": 3024,
+   "album": null
+  },
+  {
+   "id": "30258560322005984",
+   "url": "https://i5.photo.2gis.com/photo-gallery/bfe7d5b2-3ed2-4619-b74e-1c4cb3ed49a8.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560304895475",
+   "url": "https://i3.photo.2gis.com/photo-gallery/fe91e4f9-13bd-457d-81c9-84cdf00a4dae.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560304895394",
+   "url": "https://i8.photo.2gis.com/photo-gallery/5ee192d5-ee96-4cf6-aa7f-56b124333f78.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560336490404",
+   "url": "https://i9.photo.2gis.com/photo-gallery/a059512c-9669-4de4-ba2e-5f6191ed8947.jpg",
+   "alt": "Фотография от владельца",
+   "width": 4032,
+   "height": 3024,
+   "album": null
+  },
+  {
+   "id": "30258560308977577",
+   "url": "https://i8.photo.2gis.com/photo-gallery/d579dd7b-ebef-470a-aa0e-1aa5d7ae9215.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560325548531",
+   "url": "https://i0.photo.2gis.com/photo-gallery/9f101263-df19-408f-8d61-e43ca3f65f8f.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560316840841",
+   "url": "https://i1.photo.2gis.com/photo-gallery/4a3e74f2-aba1-42e7-8cc0-b5eac6223b64.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560305858200",
+   "url": "https://i9.photo.2gis.com/photo-gallery/9e03eb8d-c33e-42d0-b196-637105d9b5e9.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560304895233",
+   "url": "https://i4.photo.2gis.com/photo-gallery/c37d2d21-ed1c-46f1-bc18-48c52a70bfcf.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560317217382",
+   "url": "https://i9.photo.2gis.com/photo-gallery/01a494e3-b87d-4db3-b3e1-f26a5e500e1d.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560307225176",
+   "url": "https://i0.photo.2gis.com/photo-gallery/3917b937-0cb1-4811-959e-5b40108d38a0.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560326457675",
+   "url": "https://i5.photo.2gis.com/photo-gallery/df64974e-f29b-4e24-bb0e-09601089c09a.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560313440781",
+   "url": "https://i0.photo.2gis.com/photo-gallery/80ab7d21-92e6-45a8-9072-0e1d01240614.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560305044445",
+   "url": "https://i0.photo.2gis.com/photo-gallery/845dea4f-3c42-40a7-ab15-46d1e8bb8d65.jpg",
+   "alt": "https://i.photo.2gis.com/logo/2gis.png",
+   "width": 2250,
+   "height": 3000,
+   "album": null
+  },
+  {
+   "id": "30258560317217387",
+   "url": "https://i6.photo.2gis.com/photo-gallery/e24582cd-a93d-41a0-b33b-3533cbc21fff.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 1090,
+   "height": 1070,
+   "album": null
+  },
+  {
+   "id": "30258560307624035",
+   "url": "https://i5.photo.2gis.com/photo-gallery/29116025-fd5c-46c4-9319-bdc0fb38ca0a.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 4032,
+   "height": 3024,
+   "album": null
+  },
+  {
+   "id": "30258560336490406",
+   "url": "https://i7.photo.2gis.com/photo-gallery/af3779a2-274e-478c-98f3-bc7b291a6c68.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560315635606",
+   "url": "https://i6.photo.2gis.com/photo-gallery/d4baa771-98d6-4b5b-9959-519277157c4c.jpg",
+   "alt": "Фотография от владельца",
+   "width": 1632,
+   "height": 2988,
+   "album": null
+  },
+  {
+   "id": "30258560322008196",
+   "url": "https://i5.photo.2gis.com/photo-gallery/c73666ae-fba9-421d-aefe-4af8ba728e25.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560316876623",
+   "url": "https://i5.photo.2gis.com/photo-gallery/233f5eb3-a10d-4eb6-ba99-4430b40b3492.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560326457948",
+   "url": "https://i9.photo.2gis.com/photo-gallery/2f4b4b3a-2f3e-465a-b60f-a394adaa5016.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560324665468",
+   "url": "https://i6.photo.2gis.com/photo-gallery/e0c19e30-f8ac-4280-8edf-5d5b386d6447.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560304895180",
+   "url": "https://i8.photo.2gis.com/photo-gallery/49935b70-4274-4b78-a050-a2907a7c706a.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560336490408",
+   "url": "https://i0.photo.2gis.com/photo-gallery/145672e7-43d3-4a15-b9ea-481587152841.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560307828541",
+   "url": "https://i5.photo.2gis.com/photo-gallery/c4ccb117-46f8-4549-881c-6d3f735c28ef.jpg",
+   "alt": "Фотография от пользователя",
+   "width": 4032,
+   "height": 3024,
+   "album": null
+  },
+  {
+   "id": "30258560334085705",
+   "url": "https://i1.photo.2gis.com/photo-gallery/a7916ef4-9fc1-4325-af88-54942f09c73a.jpg",
+   "alt": "Фотография от пользователя",
+   "width": 3000,
+   "height": 4000,
+   "album": null
+  },
+  {
+   "id": "30258560337796193",
+   "url": "https://i4.photo.2gis.com/photo-gallery/100d5882-1337-4f3d-aa6a-5e3aa6743574.jpg",
+   "alt": "Фотография от пользователя",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560306212839",
+   "url": "https://i8.photo.2gis.com/photo-gallery/9dab0570-03bd-4097-ab7d-7be3146e6cd8.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560316876626",
+   "url": "https://i4.photo.2gis.com/photo-gallery/84d982f4-1d8b-442c-86ac-e48dd7ad418b.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560336804573",
+   "url": "https://i4.photo.2gis.com/photo-gallery/aa6ea246-908c-4861-b901-73bd1c28ba65.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560326965952",
+   "url": "https://i6.photo.2gis.com/photo-gallery/1099e600-0749-4614-af47-7256e02a4a92.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560315635332",
+   "url": "https://i6.photo.2gis.com/photo-gallery/1db6d021-b1dd-4f10-8147-7ef5bd042217.jpg",
+   "alt": "Фотография от владельца",
+   "width": 2160,
+   "height": 3840,
+   "album": null
+  },
+  {
+   "id": "30258560317323399",
+   "url": "https://i5.photo.2gis.com/photo-gallery/9f0ea802-7adc-4282-9aa0-21cb52d35f4b.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3000,
+   "height": 4000,
+   "album": null
+  },
+  {
+   "id": "30258560318084367",
+   "url": "https://i6.photo.2gis.com/photo-gallery/fcd75f8f-7af4-4d80-9e6b-8d004f743c78.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 1057,
+   "height": 1280,
+   "album": "entrance"
+  },
+  {
+   "id": "30258560322010172",
+   "url": "https://i0.photo.2gis.com/photo-gallery/63580852-40d5-46b8-87d0-15dd26f226a5.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560328340663",
+   "url": "https://i0.photo.2gis.com/photo-gallery/75eee3b6-0c78-4a1f-a453-532488c2f84a.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 4284,
+   "height": 5712,
+   "album": null
+  },
+  {
+   "id": "30258560325548540",
+   "url": "https://i7.photo.2gis.com/photo-gallery/928beea6-d1df-4828-8ca5-5ea39f2d215a.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560306212840",
+   "url": "https://i3.photo.2gis.com/photo-gallery/b4030e40-ad13-4ffd-a0c2-f37fa3f1f1e0.jpg",
+   "alt": "Фотография от владельца",
+   "width": 3024,
+   "height": 4032,
+   "album": null
+  },
+  {
+   "id": "30258560064765530",
+   "url": "https://i1.photo.2gis.com/images/geo/0/30258560064765530_607c.jpg",
+   "alt": "Фотография от пользователя",
+   "width": 4160,
+   "height": 3120,
+   "album": null
+  }
+ ],
+ "videos": [
+  {
+   "id": "30258560330700554",
+   "cover": "https://i1.photo.2gis.com/video-gallery/98f3e2bd-32a2-4cc6-abf5-503220430228.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 29,
+   "width": 1080,
+   "height": 1920,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/99c28c420264cd561169c6b0258f0e84399485b6/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/99c28c420264cd561169c6b0258f0e84399485b6/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560336490409",
+   "cover": "https://i1.photo.2gis.com/video-gallery/d4670a7c-1977-4064-ba08-f43ac65f1ea1.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 57,
+   "width": 1080,
+   "height": 1920,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-sdr/5efe4a0bc842c232b67034a00f87606c1ade87c3/master.m3u8"
+    },
+    {
+     "type": "hls_hdr",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-hdr/d5f78503f4451aee7eb64bb733c821fdcaed5c67/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-sdr/5efe4a0bc842c232b67034a00f87606c1ade87c3/index.mpd"
+    },
+    {
+     "type": "dash_hdr",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-hdr/d5f78503f4451aee7eb64bb733c821fdcaed5c67/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560330700556",
+   "cover": "https://i1.photo.2gis.com/video-gallery/06906ee4-f6f0-45f4-bb3f-9c2a00793809.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 6,
+   "width": 1080,
+   "height": 1920,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/218d24d9d1b99ed371b3b93468308b3e2db2c61a/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/218d24d9d1b99ed371b3b93468308b3e2db2c61a/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560330703438",
+   "cover": "https://i1.photo.2gis.com/video-gallery/6e6cdf67-8c83-4c5b-9913-a74550130b1f.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 8,
+   "width": 1920,
+   "height": 1080,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/9ed5bd6ab0ac1dbe0c627d7450ebfb2bce412ef8/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/9ed5bd6ab0ac1dbe0c627d7450ebfb2bce412ef8/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560330700555",
+   "cover": "https://i1.photo.2gis.com/video-gallery/426e6555-10d7-43a0-a036-4047e1a06a69.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 7,
+   "width": 1920,
+   "height": 1080,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/92c7f163fd46ebb4945dcd51dd621181d733a852/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/92c7f163fd46ebb4945dcd51dd621181d733a852/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560330703439",
+   "cover": "https://i1.photo.2gis.com/video-gallery/9c2d6e82-a905-4d43-9695-299a1b243907.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 7,
+   "width": 1920,
+   "height": 1080,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/ed63dbf3aa1c1e2cc1819f1a6dd868a0a8b1c181/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/ed63dbf3aa1c1e2cc1819f1a6dd868a0a8b1c181/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560330700557",
+   "cover": "https://i1.photo.2gis.com/video-gallery/df5ea14b-2d34-43fb-b2fc-724c3da75354.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 11,
+   "width": 1080,
+   "height": 1920,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/0ad1bc43cf2dd28babacab2344702f25473f3395/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/0ad1bc43cf2dd28babacab2344702f25473f3395/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560315635333",
+   "cover": "https://i1.photo.2gis.com/video-gallery/833ff93d-7b54-4ef1-8fdc-df06135c8dc9.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 14,
+   "width": 1080,
+   "height": 1920,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/f8684337738714187e3600f0594a6ba215dfc45a/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/f8684337738714187e3600f0594a6ba215dfc45a/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560330703440",
+   "cover": "https://i1.photo.2gis.com/video-gallery/651ed09a-0161-48b0-9b73-87c296c78bd2.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 4,
+   "width": 1920,
+   "height": 1080,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/0b6f357cdb19f87cfd1135c8b80e09c91b8157cd/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/0b6f357cdb19f87cfd1135c8b80e09c91b8157cd/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560330703441",
+   "cover": "https://i1.photo.2gis.com/video-gallery/fa793a9b-0afb-4e83-a179-0d02c51a71c7.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 5,
+   "width": 1080,
+   "height": 1920,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/562f96bab355bead9e58c0ea59cd2b85cfd46fd6/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/562f96bab355bead9e58c0ea59cd2b85cfd46fd6/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560317477659",
+   "cover": "https://i1.photo.2gis.com/video-gallery/8c02ebfd-6f67-4817-8be3-357a1e6bab17.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 12,
+   "width": 720,
+   "height": 1280,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/a37c73f1560445d1307435e48a171b22e3130a75/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/a37c73f1560445d1307435e48a171b22e3130a75/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560330703442",
+   "cover": "https://i1.photo.2gis.com/video-gallery/e1daf38e-74c5-40cc-9c63-adf56c1d1b3b.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 8,
+   "width": 1920,
+   "height": 1080,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/747b741f14e19961622c67f6419ce1fb2e39b231/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/747b741f14e19961622c67f6419ce1fb2e39b231/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560325332694",
+   "cover": "https://i1.photo.2gis.com/video-gallery/4a98c86e-5394-4c55-bad0-4d1ab57b819e.jpg",
+   "alt": "Видео от пользователя",
+   "duration_sec": 32,
+   "width": 1080,
+   "height": 1920,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/d55d5b84c00083a38574efa6daa8a6b8b777e9f1/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/d55d5b84c00083a38574efa6daa8a6b8b777e9f1/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560336490401",
+   "cover": "https://i1.photo.2gis.com/video-gallery/c78d0b76-a2b7-46ac-ba09-2d4c1c537b0d.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 51,
+   "width": 1920,
+   "height": 1080,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-sdr/5edf246bf2694cfd1a325ae2a4dbd1331baecbbd/master.m3u8"
+    },
+    {
+     "type": "hls_hdr",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-hdr/9c31d542c5a27b86de72b6a7df03891e2e85e8d9/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-sdr/5edf246bf2694cfd1a325ae2a4dbd1331baecbbd/index.mpd"
+    },
+    {
+     "type": "dash_hdr",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-hdr/9c31d542c5a27b86de72b6a7df03891e2e85e8d9/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560336490402",
+   "cover": "https://i1.photo.2gis.com/video-gallery/850be0c0-4629-4c83-8019-864048c214ff.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 32,
+   "width": 1080,
+   "height": 1920,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-sdr/509a0de0eea572e353d6d9d740e6a0413f3ac13d/master.m3u8"
+    },
+    {
+     "type": "hls_hdr",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-hdr/3e2f51707184991bb0ddd7c4bcc621a11a3b676a/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-sdr/509a0de0eea572e353d6d9d740e6a0413f3ac13d/index.mpd"
+    },
+    {
+     "type": "dash_hdr",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/hdr-2-hdr/3e2f51707184991bb0ddd7c4bcc621a11a3b676a/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560306752891",
+   "cover": "https://i1.photo.2gis.com/video-gallery/cabf3d6d-bc9d-468d-b142-35ea0d2d2ad5.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 22,
+   "width": 1080,
+   "height": 1920,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/904b0bf24a38876f0884f91890dbd545319d2a68/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/904b0bf24a38876f0884f91890dbd545319d2a68/index.mpd"
+    }
+   ]
+  },
+  {
+   "id": "30258560336490399",
+   "cover": "https://i1.photo.2gis.com/video-gallery/f99161d5-e183-4e9e-9741-bbad2b68dd62.jpg",
+   "alt": "Видео от владельца",
+   "duration_sec": 13,
+   "width": 1080,
+   "height": 1920,
+   "urls": [
+    {
+     "type": "hls",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/d0f11436128a374f4b8bf45f6194d3c24e11f3ec/master.m3u8"
+    },
+    {
+     "type": "dash",
+     "url": "https://filekeeper-vod.2gis.com/26111965-aeba-4b14-bf72-9493fc57c9fb-2s-2gis-ugc-vod-transcoded/sdr-2-sdr/d0f11436128a374f4b8bf45f6194d3c24e11f3ec/index.mpd"
+    }
+   ]
+  }
+ ],
+ "entrance": [
+  {
+   "url": "https://i6.photo.2gis.com/photo-gallery/fcd75f8f-7af4-4d80-9e6b-8d004f743c78.jpg",
+   "alt": "Фотография из отзывов",
+   "width": 1057,
+   "height": 1280,
+   "type": "entrance"
+  }
+ ],
+ "prices": [
+  {
+   "title": "Р’РёРґРµРѕ РјРѕРјРµРЅС‚С‹",
+   "price": "3000 в‚ё",
+   "raw": "Р’РёРґРµРѕ РјРѕРјРµРЅС‚С‹ вЂ” 3000 в‚ё"
+  },
+  {
+   "title": "Р’РёРґРµРѕ Reels",
+   "price": "7000 в‚ё",
+   "raw": "Р’РёРґРµРѕ Reels вЂ” 7000 в‚ё"
+  }
+ ],
+ "reviewPhotos": [
+  {
+   "reviewId": "294944954",
+   "author": "Р”Р°СЂСЊСЏ РЁР°С‚С‹РіРёРЅР°",
+   "url": "https://cachizer3.2gis.com/reviews-photos/b19ee8cf-5ef1-45a0-a1c2-f58aa0795a10.jpg?w=1920"
+  },
+  {
+   "reviewId": "266542246",
+   "author": "РР»СЊСЏ РљСЂРѕРЅРІР°Р»СЊРґ",
+   "url": "https://cachizer1.2gis.com/reviews-photos/c106c612-8e20-4267-bdd5-1fa53b4c4d1d.jpg?w=1920"
+  },
+  {
+   "reviewId": "262236755",
+   "author": "ZERDEM вќ¤пёЏ",
+   "url": "https://cachizer1.2gis.com/reviews-photos/1b80eaf2-4d9f-4c24-862a-808a5079351c.jpg?w=1920"
+  },
+  {
+   "reviewId": "259439524",
+   "author": "Dilnazвќ¤пёЏвЂЌрџ”Ґ вќ¤пёЏвЂЌрџ”Ґвќ¤пёЏвЂЌрџ”Ґ",
+   "url": "https://cachizer3.2gis.com/reviews-photos/063ed635-e129-4761-a370-13b6d34b479d.jpg?w=1920"
+  },
+  {
+   "reviewId": "259439515",
+   "author": "Estaym Naxy",
+   "url": "https://cachizer2.2gis.com/reviews-photos/c41aeec3-1cb3-44c1-a22d-5c3e58ed7d99.jpg?w=1920"
+  },
+  {
+   "reviewId": "258065338",
+   "author": "РЎСѓР»СѓС€Р°С€ РњСѓС…Р°РјР°РґРёРµРІР°",
+   "url": "https://cachizer1.2gis.com/reviews-photos/fe8f0cfa-b31f-47d9-a9bd-3f64033236f2.jpg?w=1920"
+  },
+  {
+   "reviewId": "258065290",
+   "author": "Р”Р°СѓСЂРµРЅ &",
+   "url": "https://cachizer3.2gis.com/reviews-photos/5887a3b4-6f05-473d-a1b7-6e96b6ac301b.jpg?w=1920"
+  },
+  {
+   "reviewId": "256884762",
+   "author": "- РќР°СЃС‚СЏ",
+   "url": "https://cachizer1.2gis.com/reviews-photos/0baf6c6a-9820-45f0-9979-b57b427ca581.jpg?w=1920"
+  },
+  {
+   "reviewId": "253369676",
+   "author": "Zhuldyz. N",
+   "url": "https://cachizer3.2gis.com/reviews-photos/f85a4532-6741-4dea-a834-42cfaf6df6c4.jpg?w=1920"
+  },
+  {
+   "reviewId": "253369462",
+   "author": "Akmaral Agzambek",
+   "url": "https://cachizer3.2gis.com/reviews-photos/4aedfa6f-3cc7-4d44-a906-cab076de75f4.jpg?w=1920"
+  },
+  {
+   "reviewId": "253369310",
+   "author": "airan",
+   "url": "https://cachizer3.2gis.com/reviews-photos/85e1cf50-863a-4b63-9918-64e34ec1a4f7.jpg?w=1920"
+  },
+  {
+   "reviewId": "248126962",
+   "author": "Р’РёРєС‚РѕСЂРёСЏ .",
+   "url": "https://cachizer1.2gis.com/reviews-photos/6e6c9603-4848-475b-b456-5e74b15b224a.jpg?w=1920"
+  },
+  {
+   "reviewId": "247090159",
+   "author": "Sana PotatoрџҐ”",
+   "url": "https://cachizer2.2gis.com/reviews-photos/c2d1cdf2-6191-41f2-87dc-715dc7bcd8f3.jpg?w=1920"
+  },
+  {
+   "reviewId": "246947952",
+   "author": "РІР»Р°РґРёРє ijjht",
+   "url": "https://cachizer2.2gis.com/reviews-photos/05d05706-1507-4d9e-ac1c-b6dc82931971.jpg?w=1920"
+  },
+  {
+   "reviewId": "246947952",
+   "author": "РІР»Р°РґРёРє ijjht",
+   "url": "https://cachizer2.2gis.com/reviews-photos/e7a053a9-98e8-46d1-9dd7-4ea26b33b7b1.jpg?w=1920"
+  },
+  {
+   "reviewId": "246494060",
+   "author": "Kyzgaldak Zaitynova",
+   "url": "https://cachizer3.2gis.com/reviews-photos/af25996a-de23-4187-b2d8-b758a2957b62.jpg?w=1920"
+  },
+  {
+   "reviewId": "244912200",
+   "author": "Aizere Muratova",
+   "url": "https://cachizer3.2gis.com/reviews-photos/eda7a3f6-f6f1-4081-a207-3e3db3eb953c.jpg?w=1920"
+  },
+  {
+   "reviewId": "242099499",
+   "author": "Tua",
+   "url": "https://cachizer2.2gis.com/reviews-photos/0e80fe30-e140-4512-8987-070812fe09fa.jpg?w=1920"
+  },
+  {
+   "reviewId": "241002645",
+   "author": "РљР°СЂРёРЅР° РР±СЂР°РµРІР°",
+   "url": "https://cachizer2.2gis.com/reviews-photos/abed86e0-cf76-4b9c-abc6-b45171bcf13a.jpg?w=1920"
+  },
+  {
+   "reviewId": "240890767",
+   "author": "Akezhan рџЌѓ",
+   "url": "https://cachizer1.2gis.com/reviews-photos/7f6c0163-e1ae-47ed-8683-2933267b94f4.jpg?w=1920"
+  },
+  {
+   "reviewId": "237770472",
+   "author": "РђСЃРёРєвќ¤пёЏ",
+   "url": "https://cachizer3.2gis.com/reviews-photos/f02d2269-1660-4d9e-a594-c9329b42223b.jpg?w=1920"
+  },
+  {
+   "reviewId": "236909498",
+   "author": "Р Р°РґРјРёР»Рѕ рџ‡Ёрџ‡і",
+   "url": "https://cachizer3.2gis.com/reviews-photos/bc2a5984-0693-43c6-b8c6-329e97edf9a5.jpg?w=1920"
+  },
+  {
+   "reviewId": "236543981",
+   "author": "Altinay Truspekova",
+   "url": "https://cachizer2.2gis.com/reviews-photos/9f5c20b0-b24e-486a-a106-a1f0f4685fb6.jpg?w=1920"
+  },
+  {
+   "reviewId": "235250659",
+   "author": "РќРёРєРёС‚Р° Рђ",
+   "url": "https://cachizer1.2gis.com/reviews-photos/d3160b53-1045-47a9-8782-d16621dc6ff9.jpg?w=1920"
+  }
+ ],
+ "reviews": [
+  {
+   "author": "РќР°Р·РµСЂРєРµ РђРјР°РЅРіРµР»СЊРґРёРµРІР°",
+   "rating": 5,
+   "date": "2026-09-25",
+   "text": "РћС‡РµРЅСЊ РєР»Р°СЃСЃРЅС‹Р№ РєРІРµСЃС‚, Р±С‹Р»Рѕ РѕС‡РµРЅСЊ СЃС‚СЂР°С€РЅРѕ, Р·Р°РґР°РЅРёР№ СЃР»РѕР¶РЅС‹Рµ РЅРѕ СЂРµР±СЏС‚Р° РїРѕРјРѕРіР°Р»Рё СЃ РїРѕРґСЃРєР°Р·РєР°РјРё, РЅРµ РїРѕР¶Р°Р»РµРµС‚Рµ РїСЂРёС…РѕРґРёС‚Рµ рџ‘Ќрџ…рџ…рџ…"
+  },
+  {
+   "author": "aruzhan рџ¤Ќ",
+   "rating": 5,
+   "date": "2026-09-24",
+   "text": "РћС‡РµРЅСЊ РїРѕРЅСЂР°РІРёР»РѕСЃСЊ СЃРѕРІРµС‚СѓСЋ!"
+  },
+  {
+   "author": "РђР»РёРЅ рџ¤Ќ",
+   "rating": 5,
+   "date": "2026-09-24",
+   "text": "РћС‡РµРЅСЊ РїРѕРЅСЂР°РІРёР»СЃСЏ РєРІРµСЃС‚! рџ”Ґ Р’СЃС‘ Р±С‹Р»Рѕ РїСЂРѕРґСѓРјР°РЅРѕ РґРѕ РјРµР»РѕС‡РµР№: РёРЅС‚РµСЂРµСЃРЅС‹Р№ СЃСЋР¶РµС‚, РєР»Р°СЃСЃРЅР°СЏ Р°С‚РјРѕСЃС„РµСЂР°"
+  },
+  {
+   "author": "Alisher Kenesov",
+   "rating": 5,
+   "date": "2026-09-24",
+   "text": "РђРЅРёРјР°С‚РѕСЂС‹ РѕС‡РµРЅСЊ СЃС‚СЂР°С€РЅС‹Рµ РІСЃРµ РїРѕРЅСЂР°РІРёР»РѕСЃСЊ."
+  },
+  {
+   "author": "РђР№С‹Рј РђС…Р±РѕС‚РёРЅР°",
+   "rating": 5,
+   "date": "2026-09-24",
+   "text": "РЎР°РјС‹Р№ РѕС„РёРіРµРЅСЃРєРёР№ РєРІРµСЃС‚рџ”Ґрџ”Ґрџ”Ґрџ”Ґрџ”ҐР±С‹Р»Рѕ РѕС‡РµРЅСЊ СЃС‚СЂР°С€РЅРѕ рџҐІрџҐІрџҐІрџҐІрџҐІ"
+  }
+ ],
+ "facts": {
+  "name": "QuestHouse Fantom & KinoLand",
+  "category": "РљРІРµСЃС‚С‹",
+  "address": "РїСЂРѕСЃРїРµРєС‚ РќСѓСЂСЃСѓР»С‚Р°РЅР° РќР°Р·Р°СЂР±Р°РµРІР°, 50, С†РѕРєРѕР»СЊРЅС‹Р№ СЌС‚Р°Р¶",
+  "city": "РЈСЃС‚СЊ-РљР°РјРµРЅРѕРіРѕСЂСЃРє, 070018",
+  "floor": "С†РѕРєРѕР»СЊРЅС‹Р№ СЌС‚Р°Р¶",
+  "hours": "РћС‚РєСЂС‹С‚Рѕ. Р•Р¶РµРґРЅРµРІРЅРѕ СЃ 09:00 РґРѕ 02:00",
+  "phone": "РЅР° РєР°СЂС‚РѕС‡РєРµ РІРёРґРµРЅ С‡Р°СЃС‚РёС‡РЅРѕ: В«+7вЂ’700вЂ’153вЂ¦В» (СЃРєСЂС‹С‚ РґРѕ РЅР°Р¶Р°С‚РёСЏ В«РџРѕРєР°Р·Р°С‚СЊ С‚РµР»РµС„РѕРЅВ»); WhatsApp-СЃСЃС‹Р»РєР° РІРµРґС‘С‚ РЅР° wa.me/77001538584 (С‚.Рµ. +7 700 153 8584)",
+  "payment": [
+   "РќР°Р»РёС‡РЅС‹Р№ СЂР°СЃС‡С‘С‚",
+   "РџРµСЂРµРІРѕРґ СЃ РєР°СЂС‚С‹",
+   "РћРїР»Р°С‚Р° РїРѕ QR-РєРѕРґСѓ"
+  ],
+  "sposoby_oplaty_istochnik": "Р’РєР»Р°РґРєР° В«РРЅС„РѕВ»",
+  "contacts": {
+   "instagram": "https://instagram.com/fantom_uka_",
+   "whatsapp": "https://wa.me/77001538584"
+  },
+  "rating": 5,
+  "reviewsCount": 343,
+  "confirmedBadge": 394,
+  "reference": "Р’ СЃРїСЂР°РІРѕС‡РЅРёРєРµ 2Р“РРЎ: РљРІРµСЃС‚С‹",
+  "nearby": "РўСЂР°РЅСЃРїРѕСЂС‚: РџР°СЂРє В«РњРµС‚Р°Р»Р»СѓСЂРіРѕРІВ» вЂ” 3 РјРёРЅ, 250 Рј; 9 РїР°СЂРєРѕРІРѕРє",
+  "features": [],
+  "featuresNote": "РћС‚РґРµР»СЊРЅС‹Рµ РѕСЃРѕР±РµРЅРЅРѕСЃС‚Рё/С‚РµРіРё РЅР° РєР°СЂС‚РѕС‡РєРµ Fantom РќР• РѕС‚РѕР±СЂР°Р¶Р°СЋС‚СЃСЏ. РЎС‚СЂРѕРєРё В«РџСЂР°Р·РґРЅРёРєРё РґР»СЏ РґРµС‚РµР№ вЂў РџСЂР°Р·РґРЅРёРєРё РґР»СЏ РїРѕРґСЂРѕСЃС‚РєРѕРІ вЂў РџСЂР°Р·РґРЅРёРєРё РґР»СЏ РІР·СЂРѕСЃР»С‹С… вЂў РћРїР»Р°С‚Р° РїРѕ QR-РєРѕРґСѓВ» РѕС‚РЅРѕСЃСЏС‚СЃСЏ Рє Р±Р»РѕРєСѓ В«РџРѕС…РѕР¶РёРµ РѕСЂРіР°РЅРёР·Р°С†РёРёВ» (Р”СЂСѓРіРёРµ РњРёСЂС‹, Questroom Razum, Fobia, РЎРµРєС‚РѕСЂ-РҐ, Questroom Pandora) Рё РќР• СЏРІР»СЏСЋС‚СЃСЏ РґР°РЅРЅС‹РјРё Fantom.",
+  "similarOrganizations": [
+   "Р”СЂСѓРіРёРµ РњРёСЂС‹, РєР»СѓР± РІРёСЂС‚СѓР°Р»СЊРЅРѕР№ СЂРµР°Р»СЊРЅРѕСЃС‚Рё",
+   "Questroom Razum",
+   "Fobia",
+   "РЎРµРєС‚РѕСЂ-РҐ",
+   "Questroom Pandora"
+  ]
+ },
+ "priceListImage": "https://i3.photo.2gis.com/photo-gallery/b4030e40-ad13-4ffd-a0c2-f37fa3f1f1e0.jpg",
+ "pricesNote": "Р’РєР»Р°РґРєР° В«Р¦РµРЅС‹В» (РЅР° РєР°СЂС‚РѕС‡РєРµ В«Р¦РµРЅС‹ 1В») СЃРѕРґРµСЂР¶РёС‚ 1 С„РѕС‚Рѕ РїСЂР°Р№СЃ-Р»РёСЃС‚Р° (Р±РµР· РѕС‚РґРµР»СЊРЅС‹С… СЃС‚СЂСѓРєС‚СѓСЂРёСЂРѕРІР°РЅРЅС‹С… С†РµРЅ). РќР° РёР·РѕР±СЂР°Р¶РµРЅРёРё РїСЂР°Р№СЃ-Р»РёСЃС‚Р°: В«Р’РР”Р•Рћ РЎРЄР•РњРљРђВ» вЂ” В«Р’РёРґРµРѕ РјРѕРјРµРЅС‚С‹ вЂ” 3000 в‚ёВ», В«Р’РёРґРµРѕ Reels вЂ” 7000 в‚ёВ».",
+ "reviewPhotosNote": "Р¤РѕС‚Рѕ РµСЃС‚СЊ РІ 23 РѕС‚Р·С‹РІР°С… (РІ РѕРґРЅРѕРј РѕС‚Р·С‹РІРµ 246947952 вЂ” 2 С„РѕС‚Рѕ, РІСЃРµРіРѕ 24 С„РѕС‚Рѕ). РџРѕРґРїРёСЃРµР№ Сѓ С„РѕС‚Рѕ РЅРµС‚.",
+ "reviewsSummary": {
+  "rating": 5,
+  "branch_reviews_count": 343,
+  "confirmedBadge": 394
+ }
+}

@@ -33,16 +33,16 @@ const router = createRouter();
 // ── Страницы ───────────────────────────────────────────────────────────────
 
 const pages = [
-  [/^\/$/, (req, res, params, query) => render.renderHome()],
-  [/^\/quests$/, () => render.renderQuests()],
+  [/^\/$/, (req, res, params, query) => render.renderHome(query)],
+  [/^\/quests$/, (req, res, params, query) => render.renderQuests(query)],
+  [/^\/prices$/, (req, res, params, query) => render.renderPrices(query)],
+  [/^\/gallery$/, (req, res, params, query) => render.renderGallery(query)],
   [/^\/booking$/, (req, res, params, query) => render.renderBooking(query)],
-  [/^\/booking\/status$/, () => render.renderBookingStatus()],
-  [/^\/how-it-works$/, () => render.renderHowItWorks()],
-  [/^\/safety$/, () => render.renderSafety()],
-  [/^\/reviews$/, () => render.renderReviews()],
-  [/^\/faq$/, () => render.renderFaq()],
-  [/^\/contacts$/, () => render.renderContacts()],
-  [/^\/privacy$/, () => render.renderPrivacy()]
+  [/^\/booking\/status$/, (req, res, params, query) => render.renderBookingStatus(query)],
+  [/^\/reviews$/, (req, res, params, query) => render.renderReviews(query)],
+  [/^\/faq$/, (req, res, params, query) => render.renderFaq(query)],
+  [/^\/contacts$/, (req, res, params, query) => render.renderContacts(query)],
+  [/^\/privacy$/, (req, res, params, query) => render.renderPrivacy(query)]
 ];
 
 for (const [pattern, handler] of pages) {
@@ -51,12 +51,6 @@ for (const [pattern, handler] of pages) {
     sendHtml(res, 200, html, { 'cache-control': 'no-cache' });
   });
 }
-
-router.get(/^\/quests\/(?<slug>[a-z0-9-]+)$/, async (req, res, params) => {
-  const html = await render.renderQuest(params.slug);
-  if (!html) throw new HttpError(404, 'not_found', 'Сценарий не найден.');
-  sendHtml(res, 200, html, { 'cache-control': 'no-cache' });
-});
 
 // Админка: статическая оболочка, данные подтягиваются по API с токеном.
 router.get(/^\/admin\/?$/, async (req, res) => {
@@ -78,25 +72,8 @@ router.get(/^\/robots\.txt$/, (req, res) => {
   });
 });
 
-router.get(/^\/healthz$/, async (req, res) => {
-  const data = await store.read();
-  sendJson(res, 200, {
-    ok: true,
-    version: config.version,
-    timezone: data.settings.timezone,
-    platform: config.platform,
-    mockMode: config.mockMode,
-    storage: {
-      driver: config.storeDriver,
-      persistent: config.persistentStorage,
-      demoMode: config.demoMode
-    },
-    bookings: data.bookings.length,
-    serverTime: new Date().toISOString()
-  });
-});
-
 // ── API ────────────────────────────────────────────────────────────────────
+// /api/health и /healthz регистрируются вместе с остальным API.
 
 api.register(router);
 

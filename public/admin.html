@@ -3,217 +3,142 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Админка Fantom</title>
+    <title>Заявки FANTOM — панель администратора</title>
     <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#050505">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/admin.css">
   </head>
   <body>
-    <div id="login-view" class="login-wrap">
-      <div class="panel">
-        <h2>Админка Fantom</h2>
+    <div id="login-view" class="login" hidden>
+      <div class="login-card">
+        <p class="login-brand">FANTOM</p>
+        <h1>Панель заявок</h1>
         <p class="muted">
-          Введите токен администратора из переменной окружения <code>ADMIN_TOKEN</code>.
-          Токен не хранится в коде и не передаётся третьим лицам.
+          Вход по паролю из переменной <code>ADMIN_PASSWORD</code>. Сессия живёт
+          12 часов и хранится в защищённой куке.
         </p>
         <div id="login-alert"></div>
         <form id="login-form" novalidate>
           <div class="field">
-            <label for="token">Токен администратора</label>
-            <input id="token" name="token" type="password" autocomplete="current-password" required>
+            <label for="password">Пароль</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
           </div>
           <button class="btn btn-primary" type="submit">Войти</button>
         </form>
+        <p class="muted"><a href="/">← Вернуться на сайт</a></p>
       </div>
-      <p class="muted"><a href="/">← На сайт</a></p>
     </div>
 
     <div id="app-view" hidden>
-      <header class="admin-header">
-        <div>
-          <a class="admin-brand" href="/">
-            Fantom<small>Панель управления</small>
-          </a>
-          <nav id="admin-tabs" role="tablist" aria-label="Разделы админки">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="topbar-brand" href="/">FANTOM<small>Заявки и настройки</small></a>
+          <nav id="tabs" role="tablist" aria-label="Разделы">
             <button role="tab" aria-selected="true" data-tab="overview">Обзор</button>
             <button role="tab" aria-selected="false" data-tab="bookings">Заявки</button>
             <button role="tab" aria-selected="false" data-tab="slots">Слоты</button>
-            <button role="tab" aria-selected="false" data-tab="quests">Сценарии</button>
-            <button role="tab" aria-selected="false" data-tab="faq">FAQ</button>
-            <button role="tab" aria-selected="false" data-tab="reviews">Отзывы</button>
+            <button role="tab" aria-selected="false" data-tab="packages">Пакеты</button>
             <button role="tab" aria-selected="false" data-tab="settings">Настройки</button>
             <button role="tab" aria-selected="false" data-tab="audit">Журнал</button>
           </nav>
-          <button class="btn btn-ghost" type="button" id="logout">Выйти</button>
+          <button class="btn" type="button" id="logout">Выйти</button>
         </div>
         <div id="global-alert"></div>
       </header>
 
-      <main class="admin-main">
+      <main class="main">
         <section data-panel="overview">
-          <div id="overview-mock"></div>
-          <div class="grid-4" id="overview-stats"></div>
-          <div class="panel">
-            <h3>Смена сегодня</h3>
-            <p class="muted" id="overview-today-label"></p>
-            <div class="slot-grid" id="overview-slots"></div>
+          <div id="overview-notice"></div>
+          <div class="stats" id="overview-stats"></div>
+          <div class="card">
+            <h2>Состояние системы</h2>
+            <ul class="kv" id="overview-health"></ul>
+            <button class="btn" type="button" id="test-notification">Проверить уведомления</button>
+            <div id="test-result" class="muted"></div>
           </div>
-          <div class="panel">
-            <h3>Последние действия</h3>
+          <div class="card">
+            <h2>Загруженность сегодня</h2>
+            <p class="muted" id="today-label"></p>
+            <div class="slot-grid" id="today-slots"></div>
+          </div>
+          <div class="card">
+            <h2>Последние действия</h2>
             <pre class="log" id="overview-audit"></pre>
           </div>
         </section>
 
         <section data-panel="bookings" hidden>
-          <div class="panel">
+          <div class="card">
             <h2>Заявки</h2>
-            <div class="row">
-              <div>
-                <label for="filter-status">Статус</label>
-                <select id="filter-status">
-                  <option value="">Все</option>
-                </select>
-              </div>
-              <div>
-                <label for="filter-q">Поиск</label>
-                <input id="filter-q" type="text" placeholder="Номер, имя или телефон">
-              </div>
-              <div>
-                <label for="filter-from">С даты</label>
-                <input id="filter-from" type="date">
-              </div>
-              <div>
-                <label for="filter-to">По дату</label>
-                <input id="filter-to" type="date">
-              </div>
-              <div><button class="btn" type="button" id="reload-bookings">Применить</button></div>
+            <div class="filters">
+              <label>Статус<select id="filter-status"><option value="">Все</option></select></label>
+              <label>Поиск<input id="filter-q" type="text" placeholder="Номер, имя или телефон"></label>
+              <label>С даты<input id="filter-from" type="date"></label>
+              <label>По дату<input id="filter-to" type="date"></label>
+              <button class="btn" type="button" id="apply-filters">Показать</button>
             </div>
           </div>
-          <div class="panel">
-            <div id="bookings-table"></div>
-          </div>
+          <div id="bookings-list"></div>
         </section>
 
         <section data-panel="slots" hidden>
-          <div class="panel">
-            <h2>Управление слотами</h2>
-            <div class="row">
-              <div>
-                <label for="slots-date">Игровой день</label>
-                <input id="slots-date" type="date">
-              </div>
-              <div><button class="btn" type="button" id="load-slots">Показать</button></div>
-            </div>
+          <div class="card">
+            <h2>Слоты</h2>
             <p class="muted">
-              Игровой день начинается в 09:00 и заканчивается в 02:00 следующих суток. Слоты после
-              полуночи помечены «+1д» и принадлежат выбранному игровому дню.
+              Игровой день начинается в 09:00 и заканчивается в 02:00 следующих суток.
+              Слоты после полуночи помечены «+1д» и принадлежат выбранному дню.
             </p>
+            <div class="filters">
+              <label>Игровой день<input id="slots-date" type="date"></label>
+              <button class="btn" type="button" id="load-slots">Показать</button>
+            </div>
             <div class="slot-grid" id="slots-grid"></div>
           </div>
         </section>
 
-        <section data-panel="quests" hidden>
-          <div class="panel">
-            <h2>Сценарии и цены</h2>
+        <section data-panel="packages" hidden>
+          <div class="card">
+            <h2>Пакеты и цены</h2>
             <p class="muted">
-              Поля, помеченные как неподтверждённые, отображаются на сайте с плашкой «Уточняется».
-              После заполнения пометка снимается автоматически.
+              Цены перенесены с реальных прайс-листов. Пакет, снятый с подтверждения,
+              пропадает из формы записи на сайте.
             </p>
-            <div id="quests-list"></div>
-          </div>
-        </section>
-
-        <section data-panel="faq" hidden>
-          <div class="panel">
-            <h2>FAQ</h2>
-            <p class="muted">
-              Ответ появляется на сайте и уходит в разметку Schema.org FAQPage только после заполнения.
-              Пустой ответ оставляет вопрос в разделе «Требует подтверждения».
-            </p>
-            <div id="faq-list"></div>
-          </div>
-          <div class="panel">
-            <h3>Добавить вопрос</h3>
-            <div class="field">
-              <label for="faq-new-q">Вопрос</label>
-              <input id="faq-new-q" type="text">
-            </div>
-            <div class="field">
-              <label for="faq-new-a">Ответ (оставьте пустым, если данных пока нет)</label>
-              <textarea id="faq-new-a"></textarea>
-            </div>
-            <div class="field">
-              <label for="faq-new-p">Текст-заглушка, пока ответ не подтверждён</label>
-              <input id="faq-new-p" type="text">
-            </div>
-            <button class="btn btn-primary" type="button" id="faq-add">Добавить</button>
-          </div>
-        </section>
-
-        <section data-panel="reviews" hidden>
-          <div class="panel">
-            <h2>Отзывы</h2>
-            <p class="muted">
-              Публикуются только отзывы с источником и датой. Без источника отзыв остаётся черновиком
-              и не попадает в Schema.org Review.
-            </p>
-            <div id="reviews-list"></div>
-          </div>
-          <div class="panel">
-            <h3>Добавить отзыв</h3>
-            <div class="row">
-              <div><label for="rev-author">Автор</label><input id="rev-author" type="text"></div>
-              <div><label for="rev-rating">Оценка</label><input id="rev-rating" type="number" min="1" max="5" step="1"></div>
-              <div><label for="rev-date">Дата отзыва</label><input id="rev-date" type="date"></div>
-            </div>
-            <div class="row">
-              <div><label for="rev-source">Источник</label><input id="rev-source" type="text" placeholder="2ГИС"></div>
-              <div><label for="rev-url">Ссылка на источник</label><input id="rev-url" type="text" placeholder="https://"></div>
-            </div>
-            <div class="field">
-              <label for="rev-text">Текст отзыва (дословно, без изменения смысла)</label>
-              <textarea id="rev-text"></textarea>
-            </div>
-            <button class="btn btn-primary" type="button" id="rev-add">Добавить</button>
+            <div id="packages-list"></div>
           </div>
         </section>
 
         <section data-panel="settings" hidden>
-          <div class="panel">
+          <div class="card">
             <h2>Часы работы</h2>
-            <div class="row">
-              <div><label for="shift-start">Начало смены</label><input id="shift-start" type="time"></div>
-              <div><label for="shift-end">Конец смены</label><input id="shift-end" type="time"></div>
-              <div><button class="btn btn-primary" type="button" id="save-hours">Сохранить</button></div>
+            <div class="filters">
+              <label>Начало смены<input id="shift-start" type="time"></label>
+              <label>Конец смены<input id="shift-end" type="time"></label>
+              <button class="btn btn-primary" type="button" id="save-hours">Сохранить</button>
             </div>
-            <p class="muted">
-              Конец смены меньше начала означает ночной график, пересекающий календарную дату.
-            </p>
           </div>
-          <div class="panel">
-            <h2>Рейтинг и отзывы в 2ГИС</h2>
-            <p class="muted">Динамические данные. Обновляйте вручную — они не должны быть зашиты в код.</p>
-            <div class="row">
-              <div><label for="rating-value">Рейтинг</label><input id="rating-value" type="number" step="0.1" min="0" max="5"></div>
-              <div><label for="rating-reviews">Оценок</label><input id="rating-reviews" type="number" min="0"></div>
-              <div><label for="rating-testimonials">Отзывов</label><input id="rating-testimonials" type="number" min="0"></div>
-              <div><label for="rating-photos">Фото</label><input id="rating-photos" type="number" min="0"></div>
+          <div class="card">
+            <h2>Рейтинг 2ГИС</h2>
+            <p class="muted">Живые данные: обновляйте вручную, чтобы они не расходились с карточкой.</p>
+            <div class="filters">
+              <label>Рейтинг<input id="rating-value" type="number" step="0.1" min="0" max="5"></label>
+              <label>Отзывов<input id="rating-reviews" type="number" min="0"></label>
+              <label>Оценок<input id="rating-ratings" type="number" min="0"></label>
+              <label>Фото<input id="rating-photos" type="number" min="0"></label>
+              <button class="btn btn-primary" type="button" id="save-rating">Сохранить</button>
             </div>
-            <button class="btn btn-primary" type="button" id="save-rating">Сохранить</button>
           </div>
-          <div class="panel">
-            <h2>Открытые вопросы к владельцу</h2>
+          <div class="card">
+            <h2>Что должен подтвердить владелец</h2>
             <div id="unconfirmed-list"></div>
           </div>
         </section>
 
         <section data-panel="audit" hidden>
-          <div class="panel">
+          <div class="card">
             <h2>Журнал действий</h2>
             <p class="muted">Персональные данные в журнале маскируются.</p>
-            <div class="row">
-              <div><button class="btn" type="button" id="reload-audit">Обновить</button></div>
-            </div>
+            <button class="btn" type="button" id="reload-audit">Обновить</button>
             <pre class="log" id="audit-log"></pre>
           </div>
         </section>

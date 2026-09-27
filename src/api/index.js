@@ -3,27 +3,22 @@
 /**
  * REST API.
  *
- * Публичные маршруты (без авторизации, с rate-limit):
- *   GET  /api/site            — настройки, факты, unconfirmed-поля
- *   GET  /api/quests          — каталог сценариев
- *   GET  /api/quests/:slug    — сценарий
- *   GET  /api/availability    — слоты на дату (?date=YYYY-MM-DD&questId=)
- *   GET  /api/calendar        — свободные места на N дней
- *   POST /api/bookings        — создать заявку
- *   GET  /api/bookings/:ref   — статус заявки по номеру + телефону
- *   GET  /api/reviews         — отзывы (только подтверждённые публикуются как отзывы)
- *   GET  /api/faq             — FAQ
+ * Публичные маршруты:
+ *   GET  /api/health         — состояние приложения, хранилища и уведомлений
+ *   GET  /api/site           — настройки, локация, источники, режим стенда
+ *   GET  /api/packages       — пакеты с реальными ценами
+ *   GET  /api/availability   — свободные слоты на дату (?date=YYYY-MM-DD)
+ *   GET  /api/calendar       — свободные места на несколько дней
+ *   GET  /api/faq, /api/reviews
+ *   POST /api/bookings       — создать заявку (идемпотентно)
+ *   GET  /api/bookings/:ref  — статус заявки по номеру и телефону
  *
- * Админские маршруты (Authorization: Bearer <ADMIN_TOKEN> или cookie fm_admin):
- *   POST   /api/admin/login
- *   GET    /api/admin/overview
- *   GET    /api/admin/bookings          PATCH /api/admin/bookings/:id
- *   GET    /api/admin/quests            PATCH /api/admin/quests/:id
- *   GET    /api/admin/slots             POST  /api/admin/slots/block
- *   GET    /api/admin/faq               POST  /api/admin/faq   PATCH /api/admin/faq/:id  DELETE
- *   GET    /api/admin/reviews           POST  /api/admin/reviews  PATCH /api/admin/reviews/:id
- *   GET    /api/admin/settings          PATCH /api/admin/settings
- *   GET    /api/admin/audit
+ * Админские маршруты (сессионная кука после входа по паролю,
+ * либо Authorization: Bearer <ADMIN_TOKEN>):
+ *   POST   /api/admin/login | /api/admin/logout
+ *   GET    /api/admin/overview | bookings | customers | audit
+ *   PATCH  /api/admin/bookings/:id | /api/admin/packages/:id | /api/admin/settings
+ *   GET    /api/admin/slots   POST /api/admin/slots/block
  */
 
 const crypto = require('crypto');
@@ -31,37 +26,23 @@ const config = require('../config');
 const store = require('../store');
 const audit = require('../lib/audit');
 const ratelimit = require('../lib/ratelimit');
+const session = require('../lib/session');
 const time = require('../lib/time');
 const availability = require('../services/availability');
 const bookings = require('../services/bookings');
-const { cleanString, normalizePhone, isValidEmail } = require('../lib/validate');
+const notify = require('../notify');
+const { cleanString, normalizePhone } = require('../lib/validate');
 const { sendJson, parseBody, clientIp, HttpError } = require('../lib/http');
 
-// ── Авторизация админки ──────────────────────────────────────────────────────
-
-function timingSafeEqual(a, b) {
-  const bufA = Buffer.from(String(a));
-  const bufB = Buffer.from(String(b));
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
-}
+/* ── Доступ и защита ───────────────────────────────────────────────────── */
 
 function isAuthorized(req) {
-  // На развёрнутом стенде со стандартным токеном-заглушкой доступ закрыт
-  // полностью: этот токен опубликован в репозитории и известен всем.
   if (config.adminLoginDisabled) return false;
+  if (session.verify(session.readCookie(req)).valid) return true;
 
   const header = String(req.headers.authorization || '');
   const bearer = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  const cookie = String(req.headers.cookie || '')
-    .split(';')
-    .map((c) => c.trim())
-    .find((c) => c.startsWith('fm_admin='));
-  const cookieToken = cookie ? decodeURIComponent(cookie.slice('fm_admin='.length)) : '';
-  return (
-    (bearer && timingSafeEqual(bearer, config.adminToken)) ||
-    (cookieToken && timingSafeEqual(cookieToken, config.adminToken))
-  );
+  return Boolean(bearer) && session.safeEqual(bearer, config.adminToken);
 }
 
 function requireAdmin(req) {
@@ -70,90 +51,29 @@ function requireAdmin(req) {
   }
 }
 
-// ── Публичная выдача данных ─────────────────────────────────────────────────
-
-function publicQuest(quest) {
-  return quest;
+/**
+ * Защита от CSRF: для изменяющих запросов проверяем Origin/Referer.
+ * Сессионная кука стоит SameSite=Strict, но проверка источника закрывает
+ * случаи, когда браузер её всё же отправит.
+ */
+function assertSameOrigin(req) {
+  const origin = req.headers.origin || req.headers.referer || '';
+  if (!origin) return; // серверные вызовы без Origin (curl, тесты) не блокируем
+  const allowed = [config.siteUrl, `http://localhost:${config.port}`, `http://127.0.0.1:${config.port}`];
+  if (!allowed.some((base) => origin.startsWith(base))) {
+    throw new HttpError(403, 'bad_origin', 'Запрос пришёл с чужого источника. Обновите страницу и попробуйте снова.');
+  }
 }
 
-async function sitePayload() {
-  const data = await store.read();
-  const next = availability.nextOpenSlot(data);
-  return {
-    settings: data.settings,
-    locations: data.locations,
-    mockMode: config.mockMode,
-    mockModeNotice: config.mockMode
-      ? 'Тестовый режим: заявки не отправляются реальному бизнесу.'
-      : null,
-    nextOpenSlot: next,
-    serverTime: new Date().toISOString(),
-    unconfirmedFields: data.settings.unconfirmedFields || [],
-    storage: {
-      driver: config.storeDriver,
-      persistent: config.persistentStorage,
-      demoMode: config.demoMode,
-      reason: config.demoReason
-    }
-  };
+function publicQuest(data) {
+  return data.quests[0];
 }
 
-async function questsPayload() {
-  const data = await store.read();
-  return { quests: data.quests.map(publicQuest) };
-}
-
-async function availabilityPayload(query) {
-  const data = await store.read();
-  const tz = data.settings.timezone || config.timezone;
-  const date = time.isValidDate(query.date) ? query.date : time.todayIn(tz);
-  const questId = query.questId || undefined;
-  return availability.forDate(data, date, { questId });
-}
-
-async function calendarPayload(query) {
-  const data = await store.read();
-  const days = Math.min(Math.max(Number(query.days) || 14, 1), config.booking.horizonDays);
-  const from = time.isValidDate(query.from) ? query.from : undefined;
-  const daysList = availability.upcoming(data, { days, from, questId: query.questId });
-  return {
-    timezone: data.settings.timezone,
-    days: daysList.map((day) => ({
-      businessDate: day.businessDate,
-      dateLabel: day.dateLabel,
-      weekday: day.weekday,
-      isPast: day.isPast,
-      openCount: day.openCount,
-      slots: day.slots.map((slot) => ({
-        id: slot.id,
-        time: slot.time,
-        crossesMidnight: slot.crossesMidnight,
-        status: slot.status,
-        available: slot.available
-      }))
-    }))
-  };
-}
-
-function reviewsPayload(data) {
-  const published = (data.reviews || []).filter((r) => r.verified && r.status === 'published');
-  const pending = (data.reviews || []).filter((r) => !r.verified || r.status !== 'published');
-  return {
-    rating: data.settings.rating,
-    published,
-    pendingCount: pending.length,
-    note:
-      'Публикуются только подтверждённые отзывы с источником и датой. ' +
-      'Schema.org Review выводится только для подтверждённых — черновики не размечаются.'
-  };
-}
-
-// ── Регистрация маршрутов ───────────────────────────────────────────────────
+/* ── Регистрация маршрутов ─────────────────────────────────────────────── */
 
 function register(router) {
   const publicLimit = (req, scope, options = {}) => {
-    const key = `${scope}:${clientIp(req)}`;
-    const result = ratelimit.check(key, {
+    const result = ratelimit.check(`${scope}:${clientIp(req)}`, {
       windowMs: options.windowMs || config.rateLimit.windowMs,
       max: options.max || config.rateLimit.max * 6
     });
@@ -164,55 +84,138 @@ function register(router) {
     }
   };
 
-  // --- Публичные ---
+  /* ── Состояние ────────────────────────────────────────────────────────── */
+
+  const health = async (req, res) => {
+    const data = await store.read();
+    const tz = data.settings.timezone;
+    const today = time.todayIn(tz);
+    const day = availability.forDate(data, today);
+    const notifyChannels = [
+      config.notifications.telegramBotToken && config.notifications.telegramChatId ? 'telegram' : null,
+      config.notifications.webhookUrl ? 'webhook' : null,
+      config.notifications.emailHttpEndpoint && config.notifications.emailTo ? 'email' : null
+    ].filter(Boolean);
+
+    sendJson(res, 200, {
+      ok: true,
+      version: config.version,
+      platform: config.platform,
+      timezone: tz,
+      serverTime: new Date().toISOString(),
+      app: { uptimeSec: Math.round(process.uptime()), node: process.version },
+      storage: {
+        driver: config.storeDriver,
+        persistent: config.persistentStorage,
+        demoMode: config.demoMode,
+        // Секреты и пути наружу не отдаём.
+        writesEnabled: config.persistentStorage && !config.demoMode
+      },
+      notifications: {
+        mockMode: config.mockMode,
+        channels: notifyChannels,
+        ready: notifyChannels.length > 0 && !config.mockMode
+      },
+      schedule: {
+        shiftStart: data.settings.hours.shiftStart,
+        shiftEnd: data.settings.hours.shiftEnd,
+        today,
+        slotsTotal: day.slots.length,
+        slotsOpen: day.openCount,
+        bookingsTotal: data.bookings.length
+      }
+    });
+  };
+
+  router.get(/^\/api\/health$/, health);
+  router.get(/^\/healthz$/, health);
+
+  /* ── Публичные данные ─────────────────────────────────────────────────── */
 
   router.get(/^\/api\/site$/, async (req, res) => {
     publicLimit(req, 'site');
-    sendJson(res, 200, await sitePayload());
-  });
-
-  router.get(/^\/api\/quests$/, async (req, res) => {
-    publicLimit(req, 'quests');
-    sendJson(res, 200, await questsPayload());
-  });
-
-  router.get(/^\/api\/quests\/(?<slug>[a-z0-9-]+)$/, async (req, res, params) => {
-    publicLimit(req, 'quest');
     const data = await store.read();
-    const quest = data.quests.find((q) => q.slug === params.slug || q.id === params.slug);
-    if (!quest) throw new HttpError(404, 'not_found', 'Сценарий не найден.');
-    sendJson(res, 200, { quest, location: data.locations.find((l) => l.id === quest.locationId) || null });
+    sendJson(res, 200, {
+      settings: data.settings,
+      location: data.locations[0],
+      quest: publicQuest(data),
+      kinoLand: data.kinoLand,
+      addons: data.addons,
+      sources: data.settings.sources,
+      storage: {
+        driver: config.storeDriver,
+        persistent: config.persistentStorage,
+        demoMode: config.demoMode,
+        reason: config.demoReason
+      },
+      serverTime: new Date().toISOString()
+    });
+  });
+
+  router.get(/^\/api\/packages$/, async (req, res) => {
+    publicLimit(req, 'packages');
+    const data = await store.read();
+    sendJson(res, 200, { packages: data.packages, addons: data.addons });
   });
 
   router.get(/^\/api\/availability$/, async (req, res, _params, query) => {
     publicLimit(req, 'availability');
-    sendJson(res, 200, await availabilityPayload(query));
+    const data = await store.read();
+    const tz = data.settings.timezone;
+    const date = time.isValidDate(query.date) ? query.date : time.todayIn(tz);
+    sendJson(res, 200, availability.forDate(data, date));
   });
 
   router.get(/^\/api\/calendar$/, async (req, res, _params, query) => {
     publicLimit(req, 'calendar');
-    sendJson(res, 200, await calendarPayload(query));
+    const data = await store.read();
+    const days = Math.min(Math.max(Number(query.days) || 14, 1), config.booking.horizonDays);
+    const from = time.isValidDate(query.from) ? query.from : undefined;
+    sendJson(res, 200, {
+      timezone: data.settings.timezone,
+      days: availability.upcoming(data, { days, from }).map((day) => ({
+        businessDate: day.businessDate,
+        label: day.label,
+        weekday: day.weekday,
+        availableCount: day.availableCount,
+        slots: day.slots.map((slot) => ({
+          time: slot.time,
+          crossesMidnight: slot.crossesMidnight,
+          status: slot.status,
+          available: slot.available
+        }))
+      }))
+    });
   });
 
   router.get(/^\/api\/faq$/, async (req, res) => {
     publicLimit(req, 'faq');
     const data = await store.read();
     sendJson(res, 200, {
-      published: data.faq.filter((f) => f.status === 'published').sort((a, b) => a.order - b.order),
-      needsConfirmation: data.faq
-        .filter((f) => f.status !== 'published')
-        .sort((a, b) => a.order - b.order)
+      published: data.faq.filter((item) => item.status === 'published'),
+      needsConfirmation: data.faq.filter((item) => item.status !== 'published')
     });
   });
 
   router.get(/^\/api\/reviews$/, async (req, res) => {
     publicLimit(req, 'reviews');
-    sendJson(res, 200, reviewsPayload(await store.read()));
+    const data = await store.read();
+    sendJson(res, 200, {
+      rating: data.settings.rating,
+      reviews: data.reviews,
+      note: 'Публикуются только отзывы с подтверждённым источником. Schema.org Review выводится для них же.'
+    });
   });
 
+  /* ── Создание заявки ──────────────────────────────────────────────────── */
+
   router.post(/^\/api\/bookings$/, async (req, res) => {
-    const key = `booking:${clientIp(req)}`;
-    const limit = ratelimit.check(key, { windowMs: config.rateLimit.windowMs, max: config.rateLimit.max });
+    assertSameOrigin(req);
+
+    const limit = ratelimit.check(`booking:${clientIp(req)}`, {
+      windowMs: config.rateLimit.windowMs,
+      max: config.rateLimit.max
+    });
     if (!limit.allowed) {
       await audit.append('booking.rate_limited', { retryAfterSec: limit.retryAfterSec }, req);
       throw new HttpError(429, 'rate_limited', 'Слишком много заявок с одного адреса. Напишите в WhatsApp.', {
@@ -221,30 +224,38 @@ function register(router) {
     }
 
     const body = await parseBody(req);
+    // Ключ идемпотентности приходит от клиента; если его нет — берём заголовок.
+    const idempotencyKey =
+      cleanString(body.idempotencyKey, 80) || cleanString(req.headers['idempotency-key'], 80) || null;
+
     try {
       const result = await bookings.create(body, {
         userAgent: req.headers['user-agent'],
-        ip: clientIp(req)
+        ip: clientIp(req),
+        idempotencyKey,
+        req
       });
-      sendJson(res, 201, {
+
+      sendJson(res, result.duplicate ? 200 : 201, {
         ok: true,
+        duplicate: Boolean(result.duplicate),
         booking: bookings.publicView(result.booking),
         demoMode: config.demoMode,
         notification: {
           mockMode: result.notification.mockMode,
           demoMode: config.demoMode,
-          delivered: result.notification.channels.filter((c) => c.ok).map((c) => c.channel),
-          manualWhatsappLink: result.notification.manual.whatsappLink
+          delivered: (result.notification.channels || []).filter((channel) => channel.ok).map((channel) => channel.channel),
+          manualWhatsappLink: result.notification.manual ? result.notification.manual.whatsappLink : null
         },
-        message: config.demoMode
-          ? 'Демонстрационный стенд: заявка показана для примера, но не сохранена и не отправлена ' +
-            'администратору. Для реальной брони напишите в WhatsApp.'
-          : 'Заявка принята. Администратор свяжется по выбранному каналу. ' +
-            'Слот закреплён за вами, пока заявка активна.'
+        message: result.duplicate
+          ? `Заявка ${result.booking.reference} уже принята — повторная отправка не создала новую.`
+          : config.demoMode
+            ? 'Демонстрационный стенд: заявка показана для примера, но не сохранена и не отправлена администратору. Для реальной брони напишите в WhatsApp.'
+            : 'Заявка принята. Администратор свяжется по выбранному каналу и подтвердит время.'
       });
     } catch (error) {
       if (error instanceof bookings.BookingError) {
-        await audit.append('booking.rejected', { code: error.code, phone: body.phone, name: body.name }, req);
+        await audit.append('booking.rejected', { code: error.code }, req);
         sendJson(res, error.status, {
           ok: false,
           code: error.code,
@@ -258,7 +269,6 @@ function register(router) {
     }
   });
 
-  // Статус заявки: номер + телефон (без авторизации, но с проверкой пары).
   router.get(/^\/api\/bookings\/(?<ref>[A-Za-z0-9-]+)$/, async (req, res, params, query) => {
     publicLimit(req, 'booking-status', { max: 20 });
     const phone = normalizePhone(query.phone || '');
@@ -270,142 +280,140 @@ function register(router) {
     sendJson(res, 200, { ok: true, booking: bookings.publicView(booking) });
   });
 
-  // --- Админка ---
+  /* ── Админка ──────────────────────────────────────────────────────────── */
 
   router.post(/^\/api\/admin\/login$/, async (req, res) => {
+    const limit = ratelimit.check(`admin-login:${clientIp(req)}`, { windowMs: 15 * 60 * 1000, max: 8 });
+    if (!limit.allowed) {
+      await audit.append('admin.login_blocked', {}, req);
+      throw new HttpError(429, 'rate_limited', 'Слишком много попыток входа. Попробуйте позже.');
+    }
+
     if (config.adminLoginDisabled) {
       throw new HttpError(
         503,
-        'admin_token_not_configured',
-        'Админка отключена: на этом стенде не задан собственный ADMIN_TOKEN. ' +
-          'Стандартный токен-заглушка не используется, потому что опубликован в репозитории. ' +
-          'Добавьте ADMIN_TOKEN в переменные окружения проекта и переопубликуйте сборку.'
+        'admin_not_configured',
+        'Админка отключена: не заданы ADMIN_PASSWORD и собственный ADMIN_TOKEN. ' +
+          'Стандартный токен-заглушка опубликован в репозитории и не может быть паролем.'
       );
     }
-    const limit = ratelimit.check(`admin-login:${clientIp(req)}`, { windowMs: 15 * 60 * 1000, max: 10 });
-    if (!limit.allowed) throw new HttpError(429, 'rate_limited', 'Слишком много попыток входа.');
+
     const body = await parseBody(req);
+    const password = cleanString(body.password, 200);
     const token = cleanString(body.token, 200);
-    if (!token || !timingSafeEqual(token, config.adminToken)) {
-      await audit.append('admin.login_failed', {}, req);
-      throw new HttpError(401, 'unauthorized', 'Неверный токен администратора.');
+
+    const okPassword = Boolean(config.adminPassword) && session.safeEqual(password, config.adminPassword);
+    const okToken =
+      Boolean(token) && !config.isDefaultAdminToken && session.safeEqual(token, config.adminToken);
+
+    if (!okPassword && !okToken) {
+      await audit.append('admin.login_failed', { ip: clientIp(req) }, req);
+      throw new HttpError(401, 'unauthorized', 'Неверный пароль.');
     }
+
     await audit.append('admin.login', {}, req);
     sendJson(
       res,
       200,
-      { ok: true, mockMode: config.mockMode, defaultToken: config.isDefaultAdminToken },
       {
-        'set-cookie': `fm_admin=${encodeURIComponent(config.adminToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200${
-          config.siteUrl.startsWith('https') ? '; Secure' : ''
-        }`
+        ok: true,
+        mockMode: config.mockMode,
+        demoMode: config.demoMode,
+        defaultCredentials: config.isDefaultAdminToken && !config.adminPassword
+      },
+      {
+        'set-cookie': session.cookieHeader(session.issue(), { secure: config.siteUrl.startsWith('https') })
       }
     );
   });
 
   router.post(/^\/api\/admin\/logout$/, async (req, res) => {
-    sendJson(res, 200, { ok: true }, { 'set-cookie': 'fm_admin=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
+    sendJson(res, 200, { ok: true }, { 'set-cookie': session.clearCookieHeader() });
   });
 
   router.get(/^\/api\/admin\/overview$/, async (req, res) => {
     requireAdmin(req);
     const data = await store.read();
     const stats = await bookings.stats();
-    const today = availability.forDate(data, stats.todayDate);
     sendJson(res, 200, {
       stats,
       mockMode: config.mockMode,
-      defaultAdminToken: config.isDefaultAdminToken,
+      demoMode: config.demoMode,
+      storage: { driver: config.storeDriver, persistent: config.persistentStorage },
+      defaultCredentials: config.isDefaultAdminToken && !config.adminPassword,
       timezone: data.settings.timezone,
       serverTime: new Date().toISOString(),
-      todaySlots: today,
-      recentAudit: await audit.tail(20)
+      todaySlots: availability.forDate(data, stats.todayDate),
+      recentAudit: await audit.tail(20),
+      notificationsReady: Boolean(
+        !config.mockMode &&
+          ((config.notifications.telegramBotToken && config.notifications.telegramChatId) ||
+            config.notifications.webhookUrl ||
+            (config.notifications.emailHttpEndpoint && config.notifications.emailTo))
+      )
     });
   });
 
   router.get(/^\/api\/admin\/bookings$/, async (req, res, _params, query) => {
     requireAdmin(req);
-    const items = await bookings.list(query);
-    sendJson(res, 200, { bookings: items, statuses: bookings.STATUS_LABELS });
+    sendJson(res, 200, {
+      bookings: await bookings.list(query),
+      statuses: bookings.STATUS_LABELS
+    });
   });
 
   router.patch(/^\/api\/admin\/bookings\/(?<id>[\w-]+)$/, async (req, res, params) => {
     requireAdmin(req);
+    assertSameOrigin(req);
     const body = await parseBody(req);
-    const status = cleanString(body.status, 40);
-    const note = cleanString(body.note, 300);
-    const updated = await bookings.setStatus(params.id, status, 'admin', note);
+    const updated = await bookings.setStatus(
+      params.id,
+      cleanString(body.status, 40),
+      'admin',
+      cleanString(body.note, 300)
+    );
     sendJson(res, 200, { ok: true, booking: updated });
   });
 
-  router.get(/^\/api\/admin\/quests$/, async (req, res) => {
+  router.get(/^\/api\/admin\/packages$/, async (req, res) => {
     requireAdmin(req);
     const data = await store.read();
-    sendJson(res, 200, { quests: data.quests });
+    sendJson(res, 200, { packages: data.packages, addons: data.addons });
   });
 
-  router.patch(/^\/api\/admin\/quests\/(?<id>[\w-]+)$/, async (req, res, params) => {
+  router.patch(/^\/api\/admin\/packages\/(?<id>[\w-]+)$/, async (req, res, params) => {
     requireAdmin(req);
+    assertSameOrigin(req);
     const body = await parseBody(req);
     const updated = await store.transaction(async (data) => {
-      const quest = data.quests.find((q) => q.id === params.id || q.slug === params.id);
-      if (!quest) throw new HttpError(404, 'not_found', 'Сценарий не найден.');
-      const allowed = [
-        'name',
-        'genre',
-        'shortDescription',
-        'longDescription',
-        'durationMinutes',
-        'intensity',
-        'ageLimit',
-        'minGuests',
-        'maxGuests',
-        'priceFrom',
-        'priceNote',
-        'contactLevel',
-        'stopWord',
-        'suitedFor',
-        'active',
-        'bookingEnabled',
-        'heroImage',
-        'gallery'
-      ];
+      const item = data.packages.find((pkg) => pkg.id === params.id);
+      if (!item) throw new HttpError(404, 'not_found', 'Пакет не найден.');
+      const allowed = ['name', 'tagline', 'priceLabel', 'priceFrom', 'priceNote', 'durationLabel', 'audienceLabel', 'includes', 'confirmed'];
       for (const key of allowed) {
-        if (body[key] !== undefined) {
-          quest[key] = body[key];
-          if (key.endsWith('Confirmed') === false) quest[`${key}Confirmed`] = true;
-        }
+        if (body[key] !== undefined) item[key] = body[key];
       }
-      if (Array.isArray(body.confirmedFields)) {
-        for (const field of body.confirmedFields) quest[`${field}Confirmed`] = true;
-      }
-      quest.updatedAt = new Date().toISOString();
-      // Автоматически снимаем пометку «нужно подтвердить» с заполненных полей.
-      quest.unconfirmed = (quest.unconfirmed || []).filter((field) => {
-        const value = quest[field];
-        return value === null || value === undefined || value === '';
-      });
-      return quest;
+      if (Array.isArray(body.includes)) item.includes = body.includes.map((line) => cleanString(line, 220)).filter(Boolean);
+      item.updatedAt = new Date().toISOString();
+      return item;
     });
-    await audit.append('admin.quest_updated', { questId: params.id }, req);
-    sendJson(res, 200, { ok: true, quest: updated });
+    await audit.append('admin.package_updated', { packageId: params.id }, req);
+    sendJson(res, 200, { ok: true, package: updated });
   });
 
   router.get(/^\/api\/admin\/slots$/, async (req, res, _params, query) => {
     requireAdmin(req);
     const data = await store.read();
-    const tz = data.settings.timezone;
-    const date = time.isValidDate(query.date) ? query.date : time.todayIn(tz);
-    sendJson(res, 200, availability.forDate(data, date, { questId: query.questId }));
+    const date = time.isValidDate(query.date) ? query.date : time.todayIn(data.settings.timezone);
+    sendJson(res, 200, availability.forDate(data, date));
   });
 
   router.post(/^\/api\/admin\/slots\/block$/, async (req, res) => {
     requireAdmin(req);
+    assertSameOrigin(req);
     const body = await parseBody(req);
     const date = cleanString(body.date, 10);
     const slotTime = cleanString(body.time, 5);
     const blocked = body.blocked !== false;
-    const note = cleanString(body.note, 200);
     if (!time.isValidDate(date) || !time.isValidTime(slotTime)) {
       throw new HttpError(422, 'bad_input', 'Нужны date (YYYY-MM-DD) и time (HH:MM).');
     }
@@ -422,19 +430,18 @@ function register(router) {
           capacity: 1,
           booked: 0,
           status: 'open',
-          questId: body.questId || null,
+          questId: null,
           bookingId: null,
           note: null,
           updatedAt: new Date().toISOString()
         };
         data.slots.push(item);
       }
-      const hasBooking = availability.isSlotTaken(data, date, slotTime);
-      if (blocked && hasBooking) {
+      if (blocked && availability.isSlotTaken(data, date, slotTime)) {
         throw new HttpError(409, 'slot_taken', 'Слот занят активной заявкой — сначала отмените заявку.');
       }
       item.status = blocked ? 'blocked' : 'open';
-      item.note = note || null;
+      item.note = cleanString(body.note, 200) || null;
       item.updatedAt = new Date().toISOString();
       return item;
     });
@@ -442,126 +449,30 @@ function register(router) {
     sendJson(res, 200, { ok: true, slot });
   });
 
-  router.get(/^\/api\/admin\/faq$/, async (req, res) => {
+  router.get(/^\/api\/admin\/customers$/, async (req, res) => {
     requireAdmin(req);
     const data = await store.read();
-    sendJson(res, 200, { faq: data.faq.sort((a, b) => a.order - b.order) });
-  });
-
-  router.post(/^\/api\/admin\/faq$/, async (req, res) => {
-    requireAdmin(req);
-    const body = await parseBody(req);
-    const created = await store.transaction(async (data) => {
-      const item = {
-        id: `faq_${crypto.randomBytes(5).toString('hex')}`,
-        question: cleanString(body.question, 200),
-        answer: cleanString(body.answer, 1200) || null,
-        status: cleanString(body.answer, 10) ? 'published' : 'needs_confirmation',
-        confirmed: Boolean(cleanString(body.answer, 1200)),
-        placeholder: cleanString(body.placeholder, 400) || null,
-        source: null,
-        order: Number(body.order) || (data.faq.length + 1) * 10
-      };
-      if (!item.question) throw new HttpError(422, 'bad_input', 'Нужен текст вопроса.');
-      data.faq.push(item);
-      return item;
+    sendJson(res, 200, {
+      customers: data.customers.map((customer) => ({
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        messenger: customer.messenger,
+        bookingsCount: customer.bookings.length,
+        createdAt: customer.createdAt
+      }))
     });
-    await audit.append('admin.faq_created', { id: created.id }, req);
-    sendJson(res, 201, { ok: true, item: created });
-  });
-
-  router.patch(/^\/api\/admin\/faq\/(?<id>[\w-]+)$/, async (req, res, params) => {
-    requireAdmin(req);
-    const body = await parseBody(req);
-    const updated = await store.transaction(async (data) => {
-      const item = data.faq.find((f) => f.id === params.id);
-      if (!item) throw new HttpError(404, 'not_found', 'Вопрос не найден.');
-      if (body.question !== undefined) item.question = cleanString(body.question, 200);
-      if (body.answer !== undefined) {
-        item.answer = cleanString(body.answer, 1200) || null;
-        item.confirmed = Boolean(item.answer);
-        item.status = item.answer ? 'published' : 'needs_confirmation';
-      }
-      if (body.placeholder !== undefined) item.placeholder = cleanString(body.placeholder, 400) || null;
-      if (body.order !== undefined) item.order = Number(body.order) || item.order;
-      item.updatedAt = new Date().toISOString();
-      return item;
-    });
-    await audit.append('admin.faq_updated', { id: params.id }, req);
-    sendJson(res, 200, { ok: true, item: updated });
-  });
-
-  router.delete(/^\/api\/admin\/faq\/(?<id>[\w-]+)$/, async (req, res, params) => {
-    requireAdmin(req);
-    await store.transaction(async (data) => {
-      const index = data.faq.findIndex((f) => f.id === params.id);
-      if (index === -1) throw new HttpError(404, 'not_found', 'Вопрос не найден.');
-      data.faq.splice(index, 1);
-    });
-    await audit.append('admin.faq_deleted', { id: params.id }, req);
-    sendJson(res, 200, { ok: true });
-  });
-
-  router.get(/^\/api\/admin\/reviews$/, async (req, res) => {
-    requireAdmin(req);
-    const data = await store.read();
-    sendJson(res, 200, { reviews: data.reviews });
-  });
-
-  router.post(/^\/api\/admin\/reviews$/, async (req, res) => {
-    requireAdmin(req);
-    const body = await parseBody(req);
-    const text = cleanString(body.text, 1200);
-    const author = cleanString(body.author, 80);
-    if (!text) throw new HttpError(422, 'bad_input', 'Нужна фактическая цитата отзыва без изменения смысла.');
-    const created = await store.transaction(async (data) => {
-      const item = {
-        id: `rev_${crypto.randomBytes(5).toString('hex')}`,
-        author: author || null,
-        rating: Number(body.rating) || null,
-        text,
-        publishedAt: cleanString(body.publishedAt, 10) || null,
-        sourceLabel: cleanString(body.sourceLabel, 40) || null,
-        sourceUrl: cleanString(body.sourceUrl, 300) || null,
-        verified: Boolean(cleanString(body.sourceUrl, 300)),
-        status: cleanString(body.sourceUrl, 300) ? 'published' : 'needs_confirmation',
-        placeholder: null,
-        order: data.reviews.length + 1
-      };
-      data.reviews.push(item);
-      return item;
-    });
-    await audit.append('admin.review_created', { id: created.id, verified: created.verified }, req);
-    sendJson(res, 201, { ok: true, item: created });
-  });
-
-  router.patch(/^\/api\/admin\/reviews\/(?<id>[\w-]+)$/, async (req, res, params) => {
-    requireAdmin(req);
-    const body = await parseBody(req);
-    const updated = await store.transaction(async (data) => {
-      const item = data.reviews.find((r) => r.id === params.id);
-      if (!item) throw new HttpError(404, 'not_found', 'Отзыв не найден.');
-      for (const key of ['author', 'text', 'sourceLabel', 'sourceUrl', 'publishedAt', 'placeholder']) {
-        if (body[key] !== undefined) item[key] = cleanString(body[key], 1200) || null;
-      }
-      if (body.rating !== undefined) item.rating = Number(body.rating) || null;
-      if (body.verified !== undefined) item.verified = Boolean(body.verified);
-      item.status = item.text && item.verified ? 'published' : 'needs_confirmation';
-      item.updatedAt = new Date().toISOString();
-      return item;
-    });
-    await audit.append('admin.review_updated', { id: params.id, verified: updated.verified }, req);
-    sendJson(res, 200, { ok: true, item: updated });
   });
 
   router.get(/^\/api\/admin\/settings$/, async (req, res) => {
     requireAdmin(req);
     const data = await store.read();
-    sendJson(res, 200, { settings: data.settings, locations: data.locations });
+    sendJson(res, 200, { settings: data.settings, location: data.locations[0], content: data.content });
   });
 
   router.patch(/^\/api\/admin\/settings$/, async (req, res) => {
     requireAdmin(req);
+    assertSameOrigin(req);
     const body = await parseBody(req);
     const updated = await store.transaction(async (data) => {
       const s = data.settings;
@@ -573,29 +484,19 @@ function register(router) {
       }
       if (body.rating) {
         const r = body.rating;
-        if (r.value !== undefined) s.rating.value = Number(r.value);
-        if (r.reviewsCount !== undefined) s.rating.reviewsCount = Number(r.reviewsCount);
-        if (r.testimonialsCount !== undefined) s.rating.testimonialsCount = Number(r.testimonialsCount);
-        if (r.photosCount !== undefined) s.rating.photosCount = Number(r.photosCount);
+        for (const key of ['value', 'reviewsCount', 'ratingsCount', 'testimonialsCount', 'photosCount', 'photosWithReviewsCount']) {
+          if (r[key] !== undefined) s.rating[key] = Number(r[key]);
+        }
         s.rating.updatedAt = time.todayIn(s.timezone);
       }
-      if (body.notificationChannel) {
-        s.notificationChannel.label = cleanString(body.notificationChannel.label, 200);
-        s.notificationChannel.confirmed = Boolean(body.notificationChannel.confirmed);
-      }
       if (body.contacts) {
-        for (const key of ['phone', 'phoneE164', 'whatsappE164', 'whatsappUrl', 'instagramUrl', 'telegramUrl']) {
+        for (const key of ['phone', 'phoneE164', 'whatsappE164', 'whatsappUrl', 'instagramUrl', 'instagramHandle']) {
           if (body.contacts[key] !== undefined) s[key] = cleanString(body.contacts[key], 200);
-        }
-      }
-      if (body.seo) {
-        for (const key of ['defaultTitle', 'defaultDescription']) {
-          if (body.seo[key] !== undefined) s.seo[key] = cleanString(body.seo[key], 300);
         }
       }
       if (body.resolveUnconfirmed) {
         const key = cleanString(body.resolveUnconfirmed, 60);
-        s.unconfirmedFields = (s.unconfirmedFields || []).filter((f) => f.key !== key);
+        s.unconfirmedFields = (s.unconfirmedFields || []).filter((field) => field.key !== key);
       }
       s.updatedAt = new Date().toISOString();
       return s;
@@ -609,20 +510,28 @@ function register(router) {
     sendJson(res, 200, { entries: await audit.tail(Math.min(Number(query.limit) || 100, 500)) });
   });
 
-  router.get(/^\/api\/admin\/customers$/, async (req, res) => {
+  router.post(/^\/api\/admin\/test-notification$/, async (req, res) => {
     requireAdmin(req);
+    assertSameOrigin(req);
     const data = await store.read();
-    // Минимум персональных данных: без выгрузки лишних полей.
-    sendJson(res, 200, {
-      customers: data.customers.map((c) => ({
-        id: c.id,
-        name: c.name,
-        phone: c.phone,
-        messenger: c.messenger,
-        bookingsCount: c.bookings.length,
-        createdAt: c.createdAt
-      }))
+    const result = await notify.dispatchBooking({
+      reference: 'TEST-000000',
+      packageName: 'Проверка канала',
+      questName: data.quests[0].name,
+      businessDate: time.todayIn(data.settings.timezone),
+      startTime: '18:00',
+      endTime: '19:00',
+      timezone: data.settings.timezone,
+      guests: 2,
+      name: 'Проверка',
+      phone: data.settings.phone,
+      messengerLabel: 'WhatsApp',
+      comment: 'Тестовое уведомление из админки',
+      consentAt: new Date().toISOString(),
+      source: 'admin-test'
     });
+    await audit.append('admin.test_notification', { mockMode: result.mockMode }, req);
+    sendJson(res, 200, { ok: result.ok, mockMode: result.mockMode, channels: result.channels });
   });
 
   return router;
