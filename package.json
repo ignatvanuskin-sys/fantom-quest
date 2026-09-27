@@ -1,0 +1,28 @@
+{
+  "name": "fantom-horror-quest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-ready horror quest website + booking API + admin dashboard for Fantom (Ust-Kamenogorsk, KZ). Zero runtime dependencies.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node src/seed.js --reset",
+    "seed:dry": "node src/seed.js",
+    "test": "node tests/run.js",
+    "shots": "node tests/screenshots.js",
+    "shots:first-screen": "node tests/screenshots.js --viewport-only --out=tests/artifacts/first-screen",
+    "shots:probe": "node tests/screenshots.js --probe=/ --probe-width=390"
+  },
+  "keywords": [
+    "horror",
+    "quest",
+    "escape-room",
+    "booking",
+    "ust-kamenogorsk"
+  ],
+  "license": "UNLICENSED"
+}

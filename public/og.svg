@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img"
+     aria-label="Fantom — хоррор-квест в Усть-Каменогорске">
+  <defs>
+    <radialGradient id="dread" cx="80%" cy="-10%" r="90%">
+      <stop offset="0" stop-color="#5a1216"/>
+      <stop offset="45%" stop-color="#150c0d"/>
+      <stop offset="100%" stop-color="#08090a"/>
+    </radialGradient>
+    <radialGradient id="lamp" cx="12%" cy="85%" r="70%">
+      <stop offset="0" stop-color="#b8d84b" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#b8d84b" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.14"/></feComponentTransfer>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#dread)"/>
+  <rect width="1200" height="630" fill="url(#lamp)"/>
+
+  <g stroke="#ffffff" stroke-opacity="0.035" stroke-width="1">
+    <path d="M0 630 L1200 210"/>
+    <path d="M0 590 L1200 170"/>
+    <path d="M240 630 L1200 330"/>
+  </g>
+
+  <rect x="56" y="48" width="1088" height="534" fill="none" stroke="#3b4449" stroke-width="2"/>
+  <text x="56" y="110" fill="#ff756f" font-family="Consolas, monospace" font-size="20" letter-spacing="6">CAM-04 · BASEMENT</text>
+  <circle cx="1080" cy="102" r="9" fill="#e53935"/>
+  <text x="1060" y="110" fill="#ff756f" font-family="Consolas, monospace" font-size="20" text-anchor="end">REC</text>
+
+  <text x="88" y="330" fill="#f1ece3" font-family="Segoe UI, Inter, sans-serif" font-weight="800" font-size="112" letter-spacing="-4">FANTOM</text>
+  <text x="92" y="392" fill="#cdd2ce" font-family="Segoe UI, Inter, sans-serif" font-size="38">Хоррор-квест в Усть-Каменогорске</text>
+  <text x="92" y="452" fill="#b8d84b" font-family="Consolas, monospace" font-size="26" letter-spacing="2">60 МИНУТ · ПРОСПЕКТ НАЗАРБАЕВА, 50 · 09:00–02:00</text>
+
+  <rect x="92" y="490" width="330" height="62" fill="#e53935"/>
+  <text x="112" y="529" fill="#ffffff" font-family="Segoe UI, Inter, sans-serif" font-weight="700" font-size="27">Выбрать дату и время</text>
+
+  <rect width="1200" height="630" filter="url(#grain)" opacity="0.5"/>
+</svg>

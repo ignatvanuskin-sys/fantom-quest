@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Fantom">
+  <rect width="64" height="64" rx="10" fill="#08090a"/>
+  <rect x="4.5" y="4.5" width="55" height="55" rx="8" fill="none" stroke="#3b4449" stroke-width="1.5"/>
+  <path d="M16 50V14h26v7.5H24.5v7.4h14.8v7.5H24.5V50z" fill="#f1ece3"/>
+  <circle cx="47" cy="47" r="5" fill="#e53935"/>
+  <path d="M4 60.5h56" stroke="#b8d84b" stroke-width="2" opacity="0.65"/>
+</svg>

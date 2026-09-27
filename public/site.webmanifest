@@ -1,0 +1,20 @@
+{
+  "name": "Fantom — хоррор-квест в Усть-Каменогорске",
+  "short_name": "Fantom",
+  "description": "Хоррор-квест Fantom: локация «Заклятия-Проклятия Монахини», 60 минут, Усть-Каменогорск.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#08090a",
+  "theme_color": "#08090a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+node_modules/
+data/db.json
+data/*.tmp
+data/audit.log.jsonl
+.env
+.env.local
+.DS_Store
+Thumbs.db
+tests/artifacts/
+media-output/
+*.log
