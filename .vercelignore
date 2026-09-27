@@ -1,7 +1,9 @@
 # Что не загружаем на Vercel: в рантайме это не нужно.
 # public/ и src/ обязаны остаться — они попадают в бандл функции
 # через includeFiles в vercel.json.
-data/
+# Важно: шаблон привязан к корню (/data/), иначе он исключает и src/data/,
+# который нужен сборке — из-за этого падал билд «Could not resolve ./data/business».
+/data/
 tests/artifacts/
 research/
 .research/

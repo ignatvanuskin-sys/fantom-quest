@@ -17,3 +17,6 @@ media-output/
 *.log
 .DS_Store
 Thumbs.db
+.admin-credentials.txt
+.vercel
+.env*

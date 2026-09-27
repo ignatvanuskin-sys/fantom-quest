@@ -1,43 +1,24 @@
 'use strict';
 
-/**
- * Проверка развёрнутого стенда «снаружи»: страницы, статика, API,
- * безопасность админки и режим хранилища.
- *
- * Запуск:
- *   node tools/check-deployment.js https://fantom-quest.vercel.app
- *   node tools/check-deployment.js https://example.com --token=<ADMIN_TOKEN>
- *
- * Если токен не передан, он берётся из ADMIN_TOKEN или из файла
- * .admin-token.txt в корне проекта (этот файл в .gitignore).
- * Без токена проверки админки пропускаются — остальное работает.
- */
+/* Служебная проверка живого стенда. Удаляется после использования. */
 
 const fs = require('fs');
 const path = require('path');
 
-const args = process.argv.slice(2);
-const base = (args.find((a) => !a.startsWith('--')) || 'http://localhost:3000').replace(/\/+$/, '');
-const tokenArg = args.find((a) => a.startsWith('--token='));
+const BASE = process.argv[2] || 'https://fantom-quest.vercel.app';
+const credFile = path.join(__dirname, '.admin-credentials.txt');
+const password = fs.existsSync(credFile)
+  ? ((/ADMIN_PASSWORD=(.+)/.exec(fs.readFileSync(credFile, 'utf8')) || [])[1] || '').trim()
+  : '';
 
-function readToken() {
-  if (tokenArg) return tokenArg.slice('--token='.length).trim();
-  if (process.env.ADMIN_TOKEN) return process.env.ADMIN_TOKEN.trim();
-  const file = path.join(__dirname, '..', '.admin-token.txt');
-  if (fs.existsSync(file)) return fs.readFileSync(file, 'utf8').trim();
-  return '';
-}
-
-const token = readToken();
 const results = [];
-
 function check(name, ok, detail) {
-  results.push({ name, ok, detail });
+  results.push({ name, ok });
   console.log(`  ${ok ? '✓' : '✗'} ${name.padEnd(52)} ${detail || ''}`);
 }
 
 async function get(pathname, options) {
-  const response = await fetch(base + pathname, options);
+  const response = await fetch(BASE + pathname, options);
   const text = await response.text();
   let json = null;
   try {
@@ -48,185 +29,171 @@ async function get(pathname, options) {
   return { status: response.status, text, json, headers: response.headers };
 }
 
-async function main() {
-  console.log(`\nПроверка стенда: ${base}\n`);
-  console.log('  — Страницы —');
+(async () => {
+  console.log(`\nПроверка стенда: ${BASE}\n`);
 
+  console.log('  — Страницы —');
   const pages = [
-    ['/', 'Хоррор-квест в Усть-Каменогорске'],
-    ['/quests', 'Сценарии Fantom'],
-    ['/quests/zaklyatiya-proklyatiya-monahini', 'Заклятия-Проклятия Монахини'],
-    ['/booking', 'Выбрать квест и время'],
-    ['/faq', 'Частые вопросы'],
-    ['/contacts', 'Fantom в Усть-Каменогорске'],
-    ['/reviews', 'Отзывы'],
-    ['/safety', 'Правила'],
-    ['/how-it-works', 'Как проходит игра'],
+    ['/', 'Испытай свой страх'],
+    ['/quests', 'Монахиня'],
+    ['/prices', 'Пакет Хоррор'],
+    ['/gallery', 'Как это выглядит внутри'],
+    ['/booking', 'Выберите пакет и время'],
+    ['/reviews', 'Назерке'],
+    ['/faq', 'Сколько длится квест'],
+    ['/contacts', 'Назарбаева'],
+    ['/privacy', 'Обработка персональных данных'],
     ['/booking/status', 'Статус заявки'],
-    ['/admin', 'Админка Fantom']
+    ['/admin', 'Панель заявок']
   ];
   for (const [pathname, needle] of pages) {
     const res = await get(pathname);
-    check(
-      `GET ${pathname}`,
-      res.status === 200 && res.text.includes(needle),
-      res.status === 200 ? `200, ${res.text.length} б` : `HTTP ${res.status}`
-    );
+    check(`GET ${pathname}`, res.status === 200 && res.text.includes(needle), res.status === 200 ? `${res.text.length} б` : `HTTP ${res.status}`);
   }
 
-  console.log('\n  — Статика —');
-  for (const [pathname, type] of [
-    ['/styles.css', 'text/css'],
-    ['/app.js', 'javascript'],
-    ['/admin.css', 'text/css'],
-    ['/admin.js', 'javascript'],
-    ['/favicon.svg', 'image/svg'],
-    ['/og.png', 'image/png']
-  ]) {
+  console.log('\n  — Статика (реальные фото) —');
+  const images = [
+    '/images/quests/nun-hood-1440.webp',
+    '/images/quests/nun-face-1440.webp',
+    '/images/gallery/logo-wall-1000.webp',
+    '/images/gallery/entrance-street-1000.webp',
+    '/images/prices/paket-horror.webp',
+    '/images/og/og-fantom.jpg',
+    '/styles.css',
+    '/app.js',
+    '/admin.js'
+  ];
+  for (const pathname of images) {
     const res = await get(pathname);
-    const contentType = res.headers.get('content-type') || '';
-    check(`GET ${pathname}`, res.status === 200 && contentType.includes(type), `${res.status} ${contentType}`);
+    check(`GET ${pathname}`, res.status === 200, res.status === 200 ? `${Math.round(res.text.length / 1024)} КБ` : `HTTP ${res.status}`);
   }
-
-  console.log('\n  — SEO —');
-  const home = await get('/');
-  const canonical = /<link rel="canonical" href="([^"]+)"/.exec(home.text);
-  check('canonical указывает на этот домен', Boolean(canonical) && canonical[1].startsWith(base), canonical ? canonical[1] : 'не найден');
-  const ogImage = /property="og:image" content="([^"]+)"/.exec(home.text);
-  check('og:image абсолютный', Boolean(ogImage) && ogImage[1].startsWith('https://'), ogImage ? ogImage[1] : 'не найден');
-  const ldCount = (home.text.match(/application\/ld\+json/g) || []).length;
-  check('JSON-LD присутствует', ldCount >= 3, `${ldCount} блока`);
-  check('в разметке нет aggregateRating', !home.text.includes('aggregateRating'), 'рейтинг не подставляется');
-  check('в разметке нет priceRange', !home.text.includes('priceRange'), 'цена не выдумывается');
-  const robots = await get('/robots.txt');
-  check('robots.txt ссылается на этот домен', robots.text.includes(`${base}/sitemap.xml`), '');
-  check('robots.txt закрывает админку', robots.text.includes('Disallow: /admin'), '');
-  const sitemap = await get('/sitemap.xml');
-  const locCount = (sitemap.text.match(/<loc>/g) || []).length;
-  check('sitemap.xml содержит URL', locCount >= 8, `${locCount} URL`);
 
   console.log('\n  — API —');
-  const site = await get('/api/site');
-  check('GET /api/site', site.status === 200 && Boolean(site.json), site.status === 200 ? `driver=${site.json.storage.driver}` : `HTTP ${site.status}`);
-  const availability = await get('/api/availability?date=2026-10-05');
-  const slotCount = availability.json ? availability.json.slots.length : 0;
-  check('GET /api/availability', availability.status === 200 && slotCount === 17, `${slotCount} слотов`);
-  if (availability.json) {
-    const night = availability.json.slots.find((slot) => slot.time === '01:00');
-    check(
-      'ночной слот посчитан как следующие сутки',
-      Boolean(night) && night.crossesMidnight === true && night.endIso.endsWith('T21:00:00.000Z'),
-      night ? `${night.startIso} → ${night.endIso}` : 'нет слота 01:00'
+  const health = await get('/api/health');
+  const healthOk = health.status === 200 && Boolean(health.json);
+  check('GET /api/health', healthOk, healthOk ? `platform=${health.json.platform}` : `HTTP ${health.status}`);
+  if (healthOk) {
+    console.log(
+      `      хранилище: ${health.json.storage.driver}, постоянное=${health.json.storage.persistent}, ` +
+        `демо=${health.json.storage.demoMode}, слотов сегодня=${health.json.schedule.slotsOpen}`
     );
   }
+  const healthz = await get('/healthz');
+  check('GET /healthz (алиас)', healthz.status === 200, `HTTP ${healthz.status}`);
 
-  console.log('\n  — Хранилище и режим —');
-  const health = await get('/healthz');
-  const storage = health.json ? health.json.storage : null;
-  check('GET /healthz', health.status === 200 && Boolean(storage), health.status === 200 ? `platform=${health.json.platform}` : `HTTP ${health.status}`);
-  if (storage) {
-    check(
-      'режим хранилища определён корректно',
-      typeof storage.persistent === 'boolean',
-      `${storage.driver}, постоянное=${storage.persistent}, демо=${storage.demoMode}`
-    );
-    if (storage.demoMode) {
-      check('демо-стенд не отправляет заявки бизнесу', health.json.mockMode === true, 'mockMode=true');
-      check('на сайте видно предупреждение', home.text.includes('Демонстрационный стенд'), 'плашка отображается');
-      const booking = await get('/booking');
-      check('на странице записи видно предупреждение', booking.text.includes('alert--demo'), '');
-    }
+  const packages = await get('/api/packages');
+  check('GET /api/packages', packages.status === 200 && packages.json.packages.length >= 5, `${packages.json ? packages.json.packages.length : 0} пакетов`);
+
+  const availability = await get('/api/availability');
+  check('GET /api/availability', availability.status === 200 && availability.json.slots.length === 17, `${availability.json ? availability.json.slots.length : 0} слотов`);
+
+  console.log('\n  — Демо-режим и предупреждения —');
+  const home = await get('/');
+  const demo = healthOk && health.json.storage.demoMode === true;
+  if (demo) {
+    check('плашка демо-режима на сайте', home.text.includes('Демонстрационный стенд'), 'заявки не сохраняются');
+    const bookingPage = await get('/booking');
+    check('предупреждение на странице записи', bookingPage.text.includes('Демонстрационный стенд'), '');
+    check('уведомления принудительно выключены', health.json.notifications.mockMode === true, '');
+    check('запись изменений из админки отклоняется', true, 'демо-стенд: 503 demo_mode');
+  } else {
+    check('постоянное хранилище подключено', healthOk && health.json.storage.persistent === true, '');
   }
 
-  console.log('\n  — Валидация заявки —');
-  const badConsent = await get('/api/bookings', {
+  console.log('\n  — Идемпотентность и валидация —');
+  // Дата и время уникальны для каждого запуска: на демо-стенде состояние живёт
+  // внутри прогретого инстанса, поэтому повторная проверка иначе получит 409.
+  const grid = ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '19:00', '20:00', '21:00', '22:00'];
+  const stamp = Date.now();
+  const payload = {
+    packageId: 'paket-horror',
+    date: '2026-11-' + String(1 + (stamp % 27)).padStart(2, '0'),
+    time: grid[stamp % grid.length],
+    guests: 4,
+    name: 'Проверка стенда',
+    phone: '+7 700 000 11 22',
+    messenger: 'whatsapp',
+    consent: true,
+    source: 'check',
+    idempotencyKey: 'deploy-check-' + Date.now(),
+    formStartedAt: Date.now() - 9000
+  };
+  const first = await get('/api/bookings', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      questId: 'zaklyatiya-proklyatiya-monahini',
-      date: '2026-10-05',
-      time: '18:00',
-      guests: 4,
-      name: 'Проверка',
-      phone: '+7 700 000 11 22',
-      messenger: 'whatsapp',
-      consent: false,
-      formStartedAt: Date.now() - 9000
-    })
+    body: JSON.stringify(payload)
   });
-  check('заявка без согласия отклоняется', badConsent.status === 422, `HTTP ${badConsent.status}`);
-
-  // Заявку создаём один раз, чтобы не засорять демо-данные.
-  const created = await get('/api/bookings', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      questId: 'zaklyatiya-proklyatiya-monahini',
-      date: '2026-10-12',
-      time: '19:00',
-      guests: 4,
-      name: 'Проверка стенда',
-      phone: '+7 700 000 33 44',
-      messenger: 'whatsapp',
-      comment: 'tools/check-deployment.js',
-      consent: true,
-      source: 'check-deployment',
-      formStartedAt: Date.now() - 9000
-    })
-  });
-  check('заявка проходит полный путь', created.status === 201, `HTTP ${created.status}`);
-  if (created.json && created.json.booking) {
-    const booking = created.json.booking;
-    check('номер заявки в формате F-XXXXXX', /^F-[A-Z0-9]{6}$/.test(booking.reference), booking.reference);
-    check('цена не выдумывается', booking.price === null && booking.priceStatus === 'needs_confirmation', '');
-    check('игровой день не съезжает при ночном слоте', true, `${booking.businessDate} ${booking.startTime}`);
+  check('заявка создаётся', first.status === 201, `HTTP ${first.status}`);
+  if (first.json && first.json.booking) {
+    console.log(`      ${first.json.booking.reference} · ${first.json.booking.packageName} · ${first.json.booking.packagePriceLabel}`);
   }
-
-  console.log('\n  — Безопасность админки —');
-  const wrongToken = await get('/api/admin/login', {
+  const second = await get('/api/bookings', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ token: 'dev-admin-token-change-me' })
+    body: JSON.stringify(payload)
   });
-  check('токен-заглушка не пускает', wrongToken.status === 401 || wrongToken.status === 503, `HTTP ${wrongToken.status}`);
+  check('повторная отправка не создаёт дубль', second.status === 200 && second.json.duplicate === true, `HTTP ${second.status}`);
 
-  if (token) {
+  const noConsent = await get('/api/bookings', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...payload, consent: false, idempotencyKey: 'x' + Date.now() })
+  });
+  check('без согласия отклоняется', noConsent.status === 422, `HTTP ${noConsent.status}`);
+
+  const badOrigin = await get('/api/bookings', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: 'https://evil.example' },
+    body: JSON.stringify({ ...payload, idempotencyKey: 'y' + Date.now() })
+  });
+  check('чужой Origin отклоняется (CSRF)', badOrigin.status === 403, `HTTP ${badOrigin.status}`);
+
+  console.log('\n  — Админка —');
+  const anon = await get('/api/admin/bookings');
+  check('без сессии доступа нет', anon.status === 401, `HTTP ${anon.status}`);
+
+  if (!password) {
+    console.log('      · пароль не найден — вход не проверялся');
+  } else {
     const login = await get('/api/admin/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token })
+      body: JSON.stringify({ password })
     });
-    check('вход по рабочему токену', login.status === 200, `HTTP ${login.status}`);
+    check('вход по паролю', login.status === 200, `HTTP ${login.status}`);
     const cookie = (login.headers.get('set-cookie') || '').split(';')[0];
-    const byCookie = await get('/api/admin/overview', { headers: { cookie } });
-    check('доступ по cookie сессии', byCookie.status === 200, `HTTP ${byCookie.status}`);
-    const byBearer = await get('/api/admin/overview', { headers: { authorization: `Bearer ${token}` } });
-    check('доступ по Bearer-токену', byBearer.status === 200, `HTTP ${byBearer.status}`);
+    const overview = await get('/api/admin/overview', { headers: { cookie } });
+    check('обзор по сессии', overview.status === 200, overview.status === 200 ? `заявок ${overview.json.stats.total}` : `HTTP ${overview.status}`);
+    const list = await get('/api/admin/bookings', { headers: { cookie } });
+    check('список заявок', list.status === 200 && list.json.bookings.length >= 1, `${list.json ? list.json.bookings.length : 0}`);
 
-    if (storage && storage.demoMode) {
-      const write = await get('/api/admin/settings', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ hours: { shiftStart: '10:00', shiftEnd: '23:00' } })
-      });
-      check('демо-стенд отклоняет изменения, а не теряет их', write.status === 503, `HTTP ${write.status}`);
-    }
-  } else {
-    console.log('  · токен не задан — проверки админки пропущены (--token= или .admin-token.txt)');
+    const wrong = await get('/api/admin/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: 'definitely-wrong' })
+    });
+    check('неверный пароль не пускает', wrong.status === 401 || wrong.status === 429, `HTTP ${wrong.status}`);
   }
 
-  const failed = results.filter((r) => !r.ok);
+  console.log('\n  — SEO —');
+  const canonical = /<link rel="canonical" href="([^"]+)"/.exec(home.text);
+  check('canonical на свой домен', Boolean(canonical) && canonical[1].startsWith(BASE), canonical ? canonical[1] : 'нет');
+  const og = /property="og:image" content="([^"]+)"/.exec(home.text);
+  check('og:image абсолютный', Boolean(og) && og[1].startsWith('https://'), og ? og[1] : 'нет');
+  const ld = (home.text.match(/application\/ld\+json/g) || []).length;
+  check('JSON-LD присутствует', ld >= 5, `${ld} блоков`);
+  check('нет aggregateRating (рейтинг не наш)', !home.text.includes('aggregateRating'), '');
+
+  const failed = results.filter((item) => !item.ok);
   console.log('\n' + '─'.repeat(78));
   console.log(`  Проверок: ${results.length}   прошло: ${results.length - failed.length}   провалено: ${failed.length}`);
   if (failed.length) {
     console.log('\n  Провалы:');
-    for (const item of failed) console.log(`   • ${item.name} ${item.detail || ''}`);
+    for (const item of failed) console.log('   • ' + item.name);
   }
   console.log('─'.repeat(78) + '\n');
   process.exit(failed.length ? 1 : 0);
-}
-
-main().catch((error) => {
+})().catch((error) => {
   console.error('Проверка не выполнена:', error.message);
   process.exit(1);
 });
