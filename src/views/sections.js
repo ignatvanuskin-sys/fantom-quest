@@ -105,7 +105,7 @@ function hero({ settings, location, quest, packages }) {
 
   return `<section class="hero" data-hero>
   <div class="hero-media fx-corners fx-corners--lg" aria-hidden="true">
-    <img src="/images/quests/nun-hood-1440.webp" alt="" width="1440" height="2636" fetchpriority="high" decoding="async">
+    <img src="/images/quests/nun-hood-900.webp" srcset="/images/quests/nun-hood-900.webp 900w, /images/quests/nun-hood-1440.webp 1440w" sizes="100vw" alt="" width="1440" height="2636" fetchpriority="high" decoding="async">
     <canvas class="fx-ink" data-fx-ink width="240" height="240"></canvas>
     <span class="hero-veil"></span>
     <span class="hero-grain"></span>

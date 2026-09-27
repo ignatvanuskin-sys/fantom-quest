@@ -103,7 +103,6 @@ function footer(settings, location) {
       Рейтинг и отзывы — динамические данные 2ГИС, обновлено ${esc(settings.rating.updatedAt)}.
       Непроверенные сведения помечены на сайте как «уточняется».
     </span>
-    <a href="/admin">Админка</a>
   </div>
 </footer>
 ${soundControl()}
@@ -149,6 +148,26 @@ function contactBar(settings) {
  * @param {boolean} [options.noindex]
  * @param {string} [options.ogType]
  */
+/**
+ * Предзагрузка главного кадра.
+ *
+ * Раньше ссылка preload стояла в <head> на каждой странице и указывала на файл
+ * 900 px, тогда как на главной <img> грузил 1440 px. Получалось два полных
+ * скачивания одной картинки вместо одного, а на всех остальных страницах —
+ * скачивание файла, который там вообще не показывается.
+ *
+ * Теперь предзагрузка есть только на главной и описывает те же варианты, что и
+ * srcset у самого <img>: браузер сам выберет 900 или 1440 под ширину экрана.
+ */
+function heroPreload(path) {
+  if (path !== '/') return '';
+  return (
+    '<link rel="preload" as="image" href="/images/quests/nun-hood-900.webp"' +
+    ' imagesrcset="/images/quests/nun-hood-900.webp 900w, /images/quests/nun-hood-1440.webp 1440w"' +
+    ' imagesizes="100vw" fetchpriority="high">'
+  );
+}
+
 function page(options) {
   const {
     title,
@@ -200,7 +219,7 @@ function page(options) {
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/favicon.svg">
     <link rel="manifest" href="/site.webmanifest">
-    <link rel="preload" as="image" href="/images/quests/nun-hood-900.webp" fetchpriority="high">
+    ${heroPreload(path)}
     <link rel="stylesheet" href="/styles.css">
     <link rel="stylesheet" href="/effects.css">
     ${ld}

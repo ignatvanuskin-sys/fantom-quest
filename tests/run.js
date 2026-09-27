@@ -798,6 +798,56 @@ async function run() {
     assert.strictEqual(miniGuests[1], '6', 'в Level mini включено 6 человек');
   });
 
+  await test('Занятость: «всего свободно» одинаково на всех страницах', async () => {
+    const found = [];
+    for (const pathname of ['/', '/quests']) {
+      const page = await get(pathname);
+      const match = /Всего свободно (\d+) (?:слот|слота|слотов)/.exec(page.text);
+      assert.ok(match, `${pathname}: нет строки «Всего свободно»`);
+      found.push({ pathname, total: Number(match[1]) });
+    }
+    // Страницы рендерятся из одного контекста, поэтому и горизонт, и подсчёт
+    // обязаны совпадать. Раньше главная считала 30 дней, а страница квеста 14,
+    // и блок показывал «501» против «229» в один момент времени.
+    for (const item of found) {
+      assert.strictEqual(
+        item.total,
+        found[0].total,
+        `${item.pathname}: ${item.total} свободных слотов, а ${found[0].pathname}: ${found[0].total}`
+      );
+    }
+    assert.ok(found[0].total > 0, 'свободных слотов не найдено вовсе');
+  });
+
+  await test('Ссылки на админку нет в публичной части сайта', async () => {
+    for (const pathname of ['/', '/quests', '/prices', '/booking', '/faq', '/contacts']) {
+      const page = await get(pathname);
+      assert.ok(
+        !page.text.includes('href="/admin"'),
+        `${pathname}: в разметке осталась ссылка на /admin`
+      );
+    }
+  });
+
+  await test('Кадр hero: адаптивные размеры, предзагрузка только на главной', async () => {
+    const home = await get('/');
+    assert.ok(
+      /<img[^>]*nun-hood-900\.webp[^>]*srcset="[^"]*nun-hood-1440\.webp 1440w/.test(home.text),
+      'у кадра hero нет srcset с двумя размерами'
+    );
+    const preload = /<link rel="preload" as="image"[^>]*>/.exec(home.text);
+    assert.ok(preload, 'на главной нет предзагрузки кадра hero');
+    assert.ok(preload[0].includes('imagesrcset'), 'предзагрузка не адаптивная');
+    assert.ok(
+      preload[0].includes('nun-hood-1440.webp'),
+      'предзагрузка описывает не тот же набор файлов, что и img — файл скачается дважды'
+    );
+
+    // На внутренних страницах кадра hero нет, значит и предзагружать нечего.
+    const inner = await get('/gallery');
+    assert.ok(!inner.text.includes('as="image"'), 'на внутренней странице лишняя предзагрузка картинки');
+  });
+
   await test('Витрина слотов не выдаёт себя за полный список', async () => {
     const home = await get('/');
     if (!home.text.includes('slot-board')) return;

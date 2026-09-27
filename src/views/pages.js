@@ -43,7 +43,7 @@ function bookingBlock(data, options = {}) {
 /* ── Главная ────────────────────────────────────────────────────────────── */
 
 function home(data) {
-  const { settings, location, quest, packages, gallery, reviews, faq, content, days, bookableDays } = data;
+  const { settings, location, quest, packages, gallery, reviews, faq, content, bookableDays } = data;
   const body = `
     ${s.hero({ settings, location, quest, packages })}
     ${s.marquee({ settings, quest })}
@@ -88,7 +88,7 @@ function home(data) {
 /* ── Квест ──────────────────────────────────────────────────────────────── */
 
 function questPage(data) {
-  const { settings, location, quest, packages, reviews, faq, content, days } = data;
+  const { settings, location, quest, packages, reviews, faq, content, bookableDays } = data;
   const features = quest.modes.list;
 
   // Самая низкая подтверждённая цена. Аудит верно заметил: человек приходит по
@@ -120,7 +120,10 @@ function questPage(data) {
           </div>
         </div>
         <figure class="quest-hero-photo">
-          <img src="/images/quests/nun-face-1440.webp" alt="Актриса в образе Монахини на локации FANTOM"
+          <img src="/images/quests/nun-face-900.webp"
+               srcset="/images/quests/nun-face-900.webp 900w, /images/quests/nun-face-1440.webp 1440w"
+               sizes="(min-width: 900px) 50vw, 100vw"
+               alt="Актриса в образе Монахини на локации FANTOM"
                width="1440" height="2560" fetchpriority="high" decoding="async">
           <figcaption>Кадр из галереи локации</figcaption>
         </figure>
@@ -131,7 +134,7 @@ function questPage(data) {
     ${s.characters({ quest })}
     ${s.fearScale({ quest })}
     ${s.gallery({ gallery: data.gallery, settings, location })}
-    ${s.slotsBoard({ days, quest, settings, limit: 4 })}
+    ${s.slotsBoard({ days: bookableDays, quest, settings, limit: 4 })}
     ${s.catalog({ packages, settings, quest })}
     ${bookingBlock(data, {
       title: 'Забронировать эту локацию',

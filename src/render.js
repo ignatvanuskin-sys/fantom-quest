@@ -21,16 +21,14 @@ async function context(query = {}) {
   const quest = data.quests.find((item) => item.isPrimary) || data.quests[0];
 
   const requestedDate = time.isValidDate(query.date) ? query.date : '';
-  const days = availability
-    .upcoming(data, { days: 14, from: requestedDate || undefined, questId: quest.id })
-    .map((day) => ({
-      businessDate: day.businessDate,
-      label: time.formatDateRu(day.businessDate),
-      weekday: day.weekday,
-      slots: day.slots,
-      availableCount: day.slots.filter((slot) => slot.status === 'open').length
-    }));
 
+  /*
+   * Горизонт свободных дней ровно один — HORIZON. Раньше рядом жил второй
+   * массив на 14 дней: главная показывала занятость по 30 дням, а страница
+   * квеста по 14, и один и тот же блок «Ближайшие игры» выдавал в один момент
+   * «всего свободно 501» и «229». Для посетителя это выглядело как случайные
+   * числа, а сайт прямо обещает не показывать цифры из головы.
+   */
   const bookableDays = availability
     .upcoming(data, { days: HORIZON, from: requestedDate || undefined, questId: quest.id })
     .map((day) => ({
@@ -54,14 +52,13 @@ async function context(query = {}) {
     reviews: data.reviews,
     faq: data.faq.slice().sort((a, b) => a.order - b.order),
     content: data.content,
-    days,
     bookableDays
   };
 }
 
 async function renderHome(query = {}) {
   const c = await context(query);
-  return pages.home({ ...c, days: c.bookableDays });
+  return pages.home(c);
 }
 
 async function renderQuests(query = {}) {
@@ -71,7 +68,7 @@ async function renderQuests(query = {}) {
 
 async function renderPrices(query = {}) {
   const c = await context(query);
-  return pages.pricesPage({ ...c, days: c.bookableDays });
+  return pages.pricesPage(c);
 }
 
 async function renderGallery(query = {}) {
@@ -101,13 +98,9 @@ async function renderBooking(query = {}) {
     ? c.packages.find((item) => item.id === query.package && item.confirmed)
     : null;
   const initialDate = time.isValidDate(query.date) ? query.date : c.bookableDays[0].businessDate;
-  const days = c.bookableDays.slice(
-    Math.max(0, c.bookableDays.findIndex((day) => day.businessDate === initialDate))
-  );
 
   return pages.bookingPage({
     ...c,
-    days: days.length ? days : c.bookableDays,
     initialPackage: requestedPackage ? requestedPackage.id : '',
     initialDate,
     preselectedSlot: time.isValidTime(query.time) ? query.time : ''
