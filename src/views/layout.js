@@ -53,7 +53,7 @@ function header(settings, path) {
         <span class="header-phone-label">Телефон</span>
         <span class="header-phone-value">${esc(settings.phone)}</span>
       </a>
-      <a class="btn btn-blood" href="/booking">Забронировать</a>
+      <a class="btn btn-blood" href="/booking" data-fx-magnetic>Забронировать</a>
     </div>
   </div>
 </header>`;
@@ -202,6 +202,7 @@ function page(options) {
     <link rel="manifest" href="/site.webmanifest">
     <link rel="preload" as="image" href="/images/quests/nun-hood-900.webp" fetchpriority="high">
     <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/effects.css">
     ${ld}
   </head>
   <body class="${esc(bodyClass)}">
@@ -212,6 +213,7 @@ ${body}
     </main>
     ${footer(settings, location)}
     <script src="/app.js" defer></script>
+    <script src="/effects.js" defer></script>
   </body>
 </html>`;
 }

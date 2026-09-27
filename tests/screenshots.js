@@ -243,10 +243,18 @@ async function capture(client, width, height, file) {
   return (await fs.stat(file)).size;
 }
 
-/** Диагностика геометрии: --probe=/booking --probe-width=390 */
+/**
+ * Диагностика геометрии: --probe=/booking --probe-width=390
+ * Список селекторов можно задать самому: --probe-selectors=".numbers b|h1"
+ * (по умолчанию — узлы hero).
+ */
 async function probe(client) {
   const url = arg('probe', '/');
   const width = Number(arg('probe-width', '390'));
+  const custom = arg('probe-selectors', '');
+  const selectors = custom
+    ? custom.split('|').map((item) => item.trim()).filter(Boolean).map((item) => JSON.stringify(item)).join(', ')
+    : `'.stage-banner', '.hero-inner', 'h1', '.hero-title-brand', '.hero-title-brand .brand-mark', '.hero-title-line', '.hero-facts', '.hero-actions'`;
   await client.send('Emulation.setDeviceMetricsOverride', {
     width,
     height: 844,
@@ -256,12 +264,24 @@ async function probe(client) {
   await client.send('Page.navigate', { url: BASE + url });
   await client.once('Page.loadEventFired').catch(() => null);
   await sleep(1200);
+  // Со своим селектором сразу подводим экран к узлу: блоки появляются при
+  // пересечении границы экрана, и без прокрутки замер покажет opacity: 0.
+  if (custom) {
+    await evaluate(
+      client,
+      `(function () {
+        var el = document.querySelector(${JSON.stringify(custom.split('|')[0].trim())});
+        if (el) el.scrollIntoView({ block: 'center' });
+      })()`
+    );
+    await sleep(900);
+  }
   const result = await evaluate(
     client,
     `JSON.stringify({
       scrollY: window.scrollY,
       viewport: [window.innerWidth, window.innerHeight],
-      nodes: ['.stage-banner', '.hero-inner', 'h1', '.hero-title-brand', '.hero-title-brand .brand-mark', '.hero-title-line', '.hero-facts', '.hero-actions']
+      nodes: [${selectors}]
         .map(function (sel) {
           var el = document.querySelector(sel);
           if (!el) return { sel: sel, missing: true };
@@ -274,6 +294,8 @@ async function probe(client) {
             h: Math.round(r.height), w: Math.round(r.width),
             position: cs.position, zIndex: cs.zIndex,
             color: cs.color, opacity: cs.opacity,
+            fill: cs.webkitTextFillColor || '—',
+            bgImage: (cs.backgroundImage || 'none').slice(0, 46),
             scrollH: el.scrollHeight, clientH: el.clientHeight,
             lineBoxes: (function () {
               var range = document.createRange();
@@ -294,7 +316,8 @@ async function probe(client) {
         `   ${node.sel.padEnd(22)} top=${String(node.top).padStart(5)} bottom=${String(node.bottom).padStart(5)} ` +
           `h=${String(node.h).padStart(4)} w=${String(node.w).padStart(4)} pos=${node.position} ` +
           `lines=${node.lineBoxes} overflow=${node.scrollH - node.clientH}px ` +
-          `color=${node.color} :: ${node.text}`
+          `color=${node.color} fill=${node.fill} opacity=${node.opacity}\n` +
+          `     bg=${node.bgImage} text="${node.text}"`
       );
     }
   }
@@ -581,8 +604,163 @@ async function run() {
     `![...document.querySelectorAll('button, a')].some(function (el) { return /оплатить|оплата заказа/i.test(el.textContent); })`
   );
 
+  /* ── Слой движения (effects.css / effects.js) ─────────────────────────
+   *
+   * Главный риск этого слоя — не «красиво или нет», а то, что блоки прячутся
+   * до появления классом .is-in. Если наблюдатель не сработает, секции
+   * останутся с opacity: 0 и сайт будет выглядеть пустым. Поэтому проверяем
+   * именно это: сколько блоков осталось невидимыми после полного прохода
+   * страницы, рисует ли что-нибудь canvas, реагируют ли фонарь и магнит,
+   * и что при prefers-reduced-motion видно всё без исключений.
+   */
+
+  console.log('\n  — Слой движения (1280 px, мышь) —');
+  await client.send('Emulation.setDeviceMetricsOverride', {
+    width: 1280,
+    height: 900,
+    deviceScaleFactor: 1,
+    mobile: false
+  });
+  await client.send('Page.navigate', { url: BASE + '/' });
+  await client.once('Page.loadEventFired').catch(() => null);
+  await sleep(1500);
+
+  const fxReady = await evaluate(client, `document.documentElement.classList.contains('fx-on')`);
+
+  /*
+   * Прокручиваем всю страницу мелкими шагами. Шаг обязан быть меньше
+   * эффективной высоты экрана: наблюдатель появления использует rootMargin
+   * -8% снизу, поэтому при крупном шаге между двумя позициями остаётся
+   * полоса, которую блок ни разу не пересекает, — и проверка показывает
+   * «не появился» там, где на самом деле всё в порядке.
+   */
+  for (let i = 1; i <= 24; i += 1) {
+    await evaluate(client, `window.scrollTo(0, document.body.scrollHeight * ${(i / 24).toFixed(4)})`);
+    await sleep(200);
+  }
+  await evaluate(client, 'window.scrollTo(0, 0)');
+  await sleep(600);
+
+  const fxHidden = JSON.parse(
+    await evaluate(
+      client,
+      `(function () {
+        var nodes = Array.prototype.slice.call(document.querySelectorAll('[data-fx]'));
+        var invisible = nodes.filter(function (el) {
+          return Number(getComputedStyle(el).opacity) < 0.9;
+        });
+        return JSON.stringify({
+          total: nodes.length,
+          missing: invisible.length,
+          sample: invisible.slice(0, 4).map(function (el) {
+            return (el.className || el.tagName).toString().slice(0, 48);
+          })
+        });
+      })()`
+    )
+  );
+
+  const inkPainted = await evaluate(
+    client,
+    `(function () {
+      var canvas = document.querySelector('[data-fx-ink]');
+      if (!canvas || !canvas.getContext) return -1;
+      var ctx = canvas.getContext('2d');
+      if (!ctx) return -1;
+      var data;
+      try {
+        data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      } catch (error) {
+        return -2;
+      }
+      var painted = 0;
+      for (var i = 3; i < data.length; i += 4) if (data[i] > 0) painted += 1;
+      return painted;
+    })()`
+  );
+
+  // Синтетическое движение мыши: проверяем не «элемент есть», а «элемент реагирует».
+  /* Движение обрабатывается в requestAnimationFrame, поэтому читать результат
+     сразу после события нельзя — ждём два кадра, иначе проверка врёт. */
+  const afterFrames = (body) =>
+    `new Promise(function (resolve) {
+      ${body}
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          resolve(typeof read === 'function' ? read() : read);
+        });
+      });
+    })`;
+
+  const torchReacts = await evaluate(
+    client,
+    afterFrames(
+      `var torch = document.querySelector('.fx-torch');
+      if (!torch) { resolve('нет элемента'); return; }
+      window.dispatchEvent(new PointerEvent('pointermove', { pointerType: 'mouse', clientX: 640, clientY: 400 }));
+      var read = function () { return torch.style.getPropertyValue('--fx-x').trim() || 'не задано'; };`
+    ),
+    true
+  );
+
+  const magnetReacts = await evaluate(
+    client,
+    afterFrames(
+      `var button = document.querySelector('[data-fx-magnetic]');
+      if (!button) { resolve('нет кнопки'); return; }
+      var rect = button.getBoundingClientRect();
+      button.dispatchEvent(new PointerEvent('pointermove', {
+        pointerType: 'mouse',
+        clientX: rect.left + rect.width - 2,
+        clientY: rect.top + 4
+      }));
+      var read = function () { return button.style.transform || 'не задано'; };`
+    ),
+    true
+  );
+
+  const osd = JSON.parse(
+    await evaluate(
+      client,
+      `(function () {
+        var time = document.querySelector('[data-fx-clock]');
+        var osd = document.querySelector('.fx-osd');
+        return JSON.stringify({
+          present: Boolean(osd),
+          display: osd ? getComputedStyle(osd).display : 'нет',
+          time: time ? time.textContent.trim() : '',
+          format: time ? /^\\d{2}:\\d{2}:\\d{2}$/.test(time.textContent.trim()) : false
+        });
+      })()`
+    )
+  );
+
+  // prefers-reduced-motion: движение обязано выключиться, а контент — остаться.
+  await client.send('Emulation.setEmulatedMedia', {
+    features: [{ name: 'prefers-reduced-motion', value: 'reduce' }]
+  });
+  await client.send('Page.navigate', { url: BASE + '/' });
+  await client.once('Page.loadEventFired').catch(() => null);
+  await sleep(1400);
+  const rmHidden = await evaluate(
+    client,
+    `[...document.querySelectorAll('[data-fx]')].filter(function (el) {
+      return Number(getComputedStyle(el).opacity) < 0.9;
+    }).length`
+  );
+  const rmTorch = await evaluate(client, `Boolean(document.querySelector('.fx-torch'))`);
+  await client.send('Emulation.setEmulatedMedia', { features: [] });
+
   report.checks = {
     techBannerVisible: mockBanner,
+    fxReady,
+    fxReveal: fxHidden,
+    fxInkPainted: inkPainted,
+    fxTorch: torchReacts,
+    fxMagnetic: magnetReacts,
+    fxOsd: osd,
+    fxReducedMotionHidden: rmHidden,
+    fxReducedMotionTorch: rmTorch,
     heroCtaLabels: ctaLabels,
     navHiddenBefore,
     navOpen: nav,
@@ -627,6 +805,19 @@ async function run() {
       `состав="${String(summaryValues.guests).trim()}", hidden=${summaryValues.hiddenTime}, выбрано=${summaryValues.selected}`
   );
   console.log(`  кнопки «Оплатить» нет:             ${noPayButton ? 'да' : 'нет'}`);
+  console.log(`  слой движения включился:           ${fxReady ? 'да' : 'НЕТ'}`);
+  console.log(
+    `  блоков не появилось после прокрутки: ${fxHidden.missing} из ${fxHidden.total}` +
+      (fxHidden.missing ? ` → ${fxHidden.sample.join(', ')}` : '')
+  );
+  console.log(`  canvas «чернил» что-то нарисовал:  ${inkPainted > 0 ? `да (${inkPainted} px)` : `НЕТ (${inkPainted})`}`);
+  console.log(`  фонарь реагирует на курсор:        ${torchReacts}`);
+  console.log(`  магнит на кнопке:                  ${magnetReacts}`);
+  console.log(
+    `  табло кадра:                       display=${osd.display}, время="${osd.time}", формат=${osd.format ? 'ок' : 'НЕТ'}`
+  );
+  console.log(`  reduced-motion прячет блоки:       ${rmHidden === 0 ? 'нет, всё видно' : `ДА — ${rmHidden} шт.`}`);
+  console.log(`  reduced-motion оставляет фонарь:   ${rmTorch ? 'ДА (проблема)' : 'нет'}`);
 
   // ── Сводка ───────────────────────────────────────────────────────────
   const bad = rows.filter((r) => !r.ok);
@@ -690,6 +881,19 @@ async function run() {
           : `**НЕТ** — перекрыто: ${stickyOverlap.coveredText.join(', ')}`
     }`,
     `- Кнопки «Оплатить» на странице нет: ${noPayButton ? 'да' : 'нет'}`,
+    '',
+    '## Слой движения',
+    '',
+    `- Скрипт эффектов включился: ${fxReady ? 'да' : '**НЕТ**'}`,
+    `- Блоков с data-fx: ${fxHidden.total}, из них осталось невидимыми после полной прокрутки: ${
+      fxHidden.missing === 0 ? '0 (норма)' : `**${fxHidden.missing}** → ${fxHidden.sample.join(', ')}`
+    }`,
+    `- Canvas «чернил» в hero: ${inkPainted > 0 ? `рисует (${inkPainted} непрозрачных пикселей)` : `**пусто (${inkPainted})**`}`,
+    `- Фонарь реагирует на курсор: ${torchReacts}`,
+    `- Магнит на главной кнопке: ${magnetReacts}`,
+    `- Табло кадра: display=${osd.display}, время «${osd.time}», формат ${osd.format ? 'верный' : '**сломан**'}`,
+    `- prefers-reduced-motion, невидимых блоков: ${rmHidden === 0 ? '0 (норма)' : `**${rmHidden}**`}`,
+    `- prefers-reduced-motion, фонарь в DOM: ${rmTorch ? '**есть (проблема)**' : 'нет'}`,
     '',
     'Примеры слотов: ' + JSON.parse(slotLabels).join(', '),
     ''

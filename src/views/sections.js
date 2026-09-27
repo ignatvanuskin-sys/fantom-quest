@@ -22,7 +22,9 @@ const money = (value) => (Number.isFinite(Number(value)) ? Number(value).toLocal
 
 function sectionHead({ eyebrow, title, lead, id, align = '', as = 'h2' }) {
   const Tag = as;
-  return `<div class="section-head${align ? ' section-head--' + align : ''}">
+  // data-fx="signal": заголовок секции появляется как переключение канала —
+  // короткая потеря строки, потом резкий кадр. См. effects.css.
+  return `<div class="section-head${align ? ' section-head--' + align : ''}" data-fx="signal">
   ${eyebrow ? `<p class="eyebrow">${esc(eyebrow)}</p>` : ''}
   <${Tag}${id ? ` id="${esc(id)}"` : ''}>${esc(title)}</${Tag}>
   ${lead ? `<p class="section-lead">${esc(lead)}</p>` : ''}
@@ -66,10 +68,19 @@ function hero({ settings, location, quest, packages }) {
   const r = settings.rating;
 
   return `<section class="hero" data-hero>
-  <div class="hero-media" aria-hidden="true">
+  <div class="hero-media fx-corners fx-corners--lg" aria-hidden="true">
     <img src="/images/quests/nun-hood-1440.webp" alt="" width="1440" height="2636" fetchpriority="high" decoding="async">
+    <canvas class="fx-ink" data-fx-ink width="240" height="240"></canvas>
     <span class="hero-veil"></span>
     <span class="hero-grain"></span>
+    <span class="fx-scanlines"></span>
+    <span class="fx-sweep"></span>
+    <span class="fx-osd">
+      <span class="fx-osd-rec"></span>
+      <span>Камера 02</span>
+      <span class="fx-osd-sep">·</span>
+      <span class="fx-osd-time" data-fx-clock>00:00:00</span>
+    </span>
   </div>
 
   <div class="wrap hero-inner">
@@ -96,7 +107,7 @@ function hero({ settings, location, quest, packages }) {
     </dl>
 
     <div class="hero-actions">
-      <a class="btn btn-blood btn-xl" href="/booking" data-cta="hero">Забронировать</a>
+      <a class="btn btn-blood btn-xl fx-beam" href="/booking" data-cta="hero" data-fx-magnetic>Забронировать</a>
       <a class="btn btn-outline btn-xl" href="#quests" data-cta="catalog">Выбрать квест</a>
     </div>
 
@@ -191,7 +202,7 @@ function slotsBoard({ days, quest, settings, limit = 6 }) {
         ? `<ul class="slot-board">
       ${rows
         .map(
-          (row) => `<li class="slot-row">
+          (row) => `<li class="slot-row" data-fx="rise">
         <div class="slot-row-when">
           <b>${esc(row.slot.time)}</b>
           <span>${esc(row.day.label)}${row.slot.crossesMidnight ? ' · после полуночи' : ''}</span>
@@ -263,7 +274,7 @@ function catalog({ packages, settings, quest }) {
 }
 
 function catalogCard(item) {
-  return `<article class="quest-card" data-duration="${esc(item.durationLabel || '')}" id="${esc(item.id)}">
+  return `<article class="quest-card fx-beam" data-duration="${esc(item.durationLabel || '')}" id="${esc(item.id)}" data-fx="rise" data-fx-spot>
   <a class="quest-card-media" href="#${esc(item.id)}" aria-label="${esc(item.name)}">
     ${
       item.priceListImage
@@ -485,7 +496,7 @@ function gallery({ gallery, settings, location, withViewer = true, limit = 0 }) 
   <div class="gallery-strip" data-gallery>
     ${items
       .map(
-        (item, index) => `<figure class="gallery-item" data-slot="${index % 7}">
+        (item, index) => `<figure class="gallery-item" data-slot="${index % 7}" data-fx="fade">
       <button class="gallery-button" type="button" data-gallery-open="${index}"
               aria-label="Открыть фото: ${esc(item.caption)}">
         <img src="${esc(item.thumb)}" alt="${esc(item.alt)}" width="1000" height="1250"
@@ -576,12 +587,12 @@ function numbers({ settings, quest, packages, location }) {
     })}
 
     <ul class="numbers">
-      <li><b>${esc(String(settings.rating.reviewsCount))}</b><span>отзыва в ${esc(settings.rating.sourceLabel)}</span></li>
-      <li><b>${esc(String(settings.rating.photosCount))}</b><span>фото локации</span></li>
-      <li><b>${esc(String(quest.durationMinutes))}</b><span>минут длится квест</span></li>
-      <li><b>${esc(String(quest.characters.length))}</b><span>персонажа в сценарии</span></li>
-      <li><b>${esc(String(quest.modes.list.length))}</b><span>режима страха</span></li>
-      <li><b>${esc(String(confirmedPackages))}</b><span>программы с ценой</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(settings.rating.reviewsCount))}</b><span>отзыва в ${esc(settings.rating.sourceLabel)}</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(settings.rating.photosCount))}</b><span>фото локации</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(quest.durationMinutes))}</b><span>минут длится квест</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(quest.characters.length))}</b><span>персонажа в сценарии</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(quest.modes.list.length))}</b><span>режима страха</span></li>
+      <li data-fx="rise"><b class="fx-dot">${esc(String(confirmedPackages))}</b><span>программы с ценой</span></li>
     </ul>
 
     <div class="numbers-sources">
@@ -646,7 +657,7 @@ function reviews({ settings, reviews, limit = 6 }) {
 }
 
 function reviewCard(review) {
-  return `<article class="review">
+  return `<article class="review" data-fx="rise">
   <header class="review-head">
     <b class="review-author">${esc(review.author)}</b>
     <span class="review-rating" aria-label="Оценка ${review.rating} из 5">${'★'.repeat(review.rating || 5)}</span>
@@ -792,7 +803,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
         .join('')}
     </ol>
 
-    <fieldset class="wizard-step is-active" data-step="1">
+    <fieldset class="fx-corners fx-corners--hot wizard-step is-active" data-step="1">
       <legend class="wizard-legend">Шаг 1 из 6. Выберите программу</legend>
       <div class="package-picker" role="radiogroup" aria-label="Программа">
         ${bookable
@@ -817,7 +828,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       </div>
     </fieldset>
 
-    <fieldset class="wizard-step" data-step="2">
+    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="2">
       <legend class="wizard-legend">Шаг 2 из 6. Выберите дату</legend>
       <div class="date-strip" data-date-strip role="radiogroup" aria-label="Игровой день">
         ${days
@@ -841,7 +852,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       </div>
     </fieldset>
 
-    <fieldset class="wizard-step" data-step="3">
+    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="3">
       <legend class="wizard-legend">Шаг 3 из 6. Выберите время</legend>
       <p class="wizard-hint" data-slot-day></p>
       <div class="slot-picker" role="radiogroup" aria-label="Свободное время" data-slot-picker>
@@ -855,7 +866,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       </div>
     </fieldset>
 
-    <fieldset class="wizard-step" data-step="4">
+    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="4">
       <legend class="wizard-legend">Шаг 4 из 6. Сколько вас будет</legend>
       <div class="stepper" role="group" aria-label="Количество игроков">
         <button class="stepper-btn" type="button" data-guests-minus aria-label="Меньше">−</button>
@@ -873,7 +884,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       </div>
     </fieldset>
 
-    <fieldset class="wizard-step" data-step="5">
+    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="5">
       <legend class="wizard-legend">Шаг 5 из 6. Контакты</legend>
       <div class="field">
         <label for="name">Имя</label>
@@ -916,7 +927,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
       </div>
     </fieldset>
 
-    <fieldset class="wizard-step" data-step="6">
+    <fieldset class="fx-corners fx-corners--hot wizard-step" data-step="6">
       <legend class="wizard-legend">Шаг 6 из 6. Проверьте и подтвердите</legend>
       <dl class="confirm-list" data-confirm></dl>
       <p class="wizard-error" data-form-error role="alert" aria-live="assertive" hidden></p>
@@ -931,7 +942,7 @@ function bookingWizard({ settings, packages, days, quest, initialPackage, initia
   </form>
 
   <aside class="wizard-summary" aria-live="polite">
-    <div class="summary-card">
+    <div class="summary-card fx-corners">
       <p class="summary-title">Ваша бронь</p>
       <ul class="summary-list">
         <li><span>Программа</span><b data-summary-package>—</b></li>
@@ -1026,7 +1037,7 @@ function locationSection({ settings, location }) {
 
 function faqItem(item, index) {
   const published = item.status === 'published' && item.answer;
-  return `<details class="faq"${index === 0 ? ' open' : ''}>
+  return `<details class="faq"${index === 0 ? ' open' : ''} data-fx="rise">
   <summary>
     <span class="faq-index">${String(index + 1).padStart(2, '0')}</span>
     <span class="faq-question">${esc(item.question)}</span>
@@ -1072,7 +1083,7 @@ function finalCta({ settings, content, location }) {
     <h2 class="final-title">${esc(cta.title)}</h2>
     <p class="final-lead">${esc(cta.lead)}</p>
     <div class="final-actions">
-      <a class="btn btn-blood btn-xl" href="/booking" data-cta="final">Забронировать квест</a>
+      <a class="btn btn-blood btn-xl fx-beam" href="/booking" data-cta="final" data-fx-magnetic>Забронировать квест</a>
       <a class="btn btn-outline btn-xl" href="tel:${esc(settings.phoneE164)}" data-cta="phone">${esc(settings.phone)}</a>
     </div>
     <p class="final-note">Заявка бесплатная. Администратор подтвердит время в WhatsApp — и всё.</p>
