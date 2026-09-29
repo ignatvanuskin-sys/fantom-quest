@@ -16,6 +16,7 @@
     "test:kv": "node tests/kv-persistence.js",
     "deploy": "vercel --prod",
     "check:deploy": "node tools/check-deployment.js",
+    "audit:booking": "node tools/audit-booking.js",
     "qa:browser": "node tests/browser-qa.js",
     "qa:ui": "node tests/ui-rules.js",
     "shots": "node tests/screenshots.js",

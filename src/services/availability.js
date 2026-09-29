@@ -210,7 +210,11 @@ function validateRequestedSlot(data, businessDate, slotTime, options = {}) {
   if (start.getTime() < now.getTime()) {
     return { ok: false, code: 'in_past', message: 'Это время уже прошло. Выберите другой слот.' };
   }
-  return { ok: true, start, end, duration, timezone: tz };
+  // Слот ночной, если его локальная календарная дата отличается от игрового дня.
+  // Раньше здесь стояло сравнение времени с «09:00», зашитым в код: при смене
+  // начала смены в админке признак врёт, и в подтверждении появляется «ночь».
+  const crossesMidnight = time.utcToZoned(tz, start).date !== businessDate;
+  return { ok: true, start, end, duration, timezone: tz, crossesMidnight };
 }
 
 module.exports = {

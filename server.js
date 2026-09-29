@@ -25,6 +25,7 @@ const {
   serveStatic,
   logRequest,
   ensureDataDirs,
+  suppressBodyForHead,
   HttpError
 } = require('./src/lib/http');
 
@@ -88,6 +89,7 @@ function parseQuery(url) {
 async function handle(req, res) {
   const startedAt = Date.now();
   const url = new URL(req.url, config.siteUrl);
+  suppressBodyForHead(req, res);
 
   try {
     // Стенд без постоянного хранилища: изменения из админки исчезнут вместе

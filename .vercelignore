@@ -10,8 +10,16 @@ research/
 media-output/
 .vercel/
 node_modules/
+
+# Секреты и локальные файлы. Их не должно быть ни в бандле, ни в артефакте сборки.
 .env
-.env.local
+.env.*
+!.env.example
 .admin-token.txt
+.admin-credentials.txt
+
+# Служебные файлы и артефакты проверок.
 *.log
 *.tmp
+.tmp-*
+qa-*.txt

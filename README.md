@@ -14,7 +14,7 @@ Production-ready сайт квеста Fantom (QuestHouse Fantom & KinoLand, У�
 ```bash
 node src/seed.js --reset    # создать базу из исходных данных
 npm start                   # http://localhost:3000
-npm test                    # 59 тестов: API, слоты, ночной график, админка, SEO
+npm test                    # тесты API, слотов, ночного графика, админки, SEO, UI-правил
 ```
 
 Админка: `http://localhost:3000/admin` · токен по умолчанию `dev-admin-token-change-me`

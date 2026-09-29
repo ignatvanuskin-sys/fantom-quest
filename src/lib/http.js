@@ -35,8 +35,20 @@ function createRouter() {
     put: (p, h, o) => add('PUT', p, h, o),
     delete: (p, h, o) => add('DELETE', p, h, o),
     match(method, pathname) {
+      const wanted = method.toUpperCase();
+      // HEAD по контракту HTTP обязан отдавать то же, что GET, но без тела.
+      // Раньше HEAD / отвечал 404: поисковики, мониторы и проверки кеша
+      // считают такой ответ обрывом сайта.
+      if (wanted === 'HEAD') {
+        for (const route of routes) {
+          if (route.method !== 'GET') continue;
+          const match = route.pattern.exec(pathname);
+          if (match) return { route, params: match.groups || {}, match };
+        }
+        return null;
+      }
       for (const route of routes) {
-        if (route.method !== method.toUpperCase()) continue;
+        if (route.method !== wanted) continue;
         const match = route.pattern.exec(pathname);
         if (match) return { route, params: match.groups || {}, match };
       }
@@ -46,8 +58,33 @@ function createRouter() {
   };
 }
 
+/**
+ * Content-Security-Policy. На сайте нет ни одного исполняемого inline-скрипта
+ * и ни одного inline-обработчика: разметка целиком серверная, данные для
+ * клиента лежат в <script type="application/json">, а JSON-LD — в
+ * <script type="application/ld+json">. Оба типа не исполняются браузером,
+ * поэтому policy их не затрагивает, и 'unsafe-inline' не требуется.
+ *
+ * style-src оставлен с 'unsafe-inline' намеренно: анимации и позиционирование
+ * задаются через style в разметке и в клиентском коде (появление блоков,
+ * визир кадра), и без этого допуска сайт разваливается визуально.
+ */
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "object-src 'none'"
+].join('; ');
+
 function securityHeaders(extra = {}) {
   return {
+    'Content-Security-Policy': CSP,
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'SAMEORIGIN',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
@@ -160,7 +197,15 @@ const MIME = {
 };
 
 async function serveStatic(req, res, pathname) {
-  const relative = decodeURIComponent(pathname).replace(/^\/+/, '');
+  // Битая escape-последовательность («/images/%E0%A4%A») раньше роняла
+  // decodeURIComponent и давала 500. Для пользователя это обычная опечатка
+  // в адресе, поэтому отвечаем 404, а не аварией сервера.
+  let relative;
+  try {
+    relative = decodeURIComponent(pathname).replace(/^\/+/, '');
+  } catch {
+    return false;
+  }
   if (!relative) return false;
   const resolved = path.resolve(config.publicDir, relative);
   // Защита от path traversal.
@@ -210,6 +255,18 @@ function logRequest(req, res, startedAt) {
   else console.log('[http] ' + line);
 }
 
+/**
+ * HEAD обязан повторять заголовки GET, но не отправлять тело.
+ * Тело формируется в обработчике как обычно — здесь мы лишь отбрасываем
+ * байты на выходе, поэтому sendHtml/sendJson менять не приходится.
+ */
+function suppressBodyForHead(req, res) {
+  if (String(req.method).toUpperCase() !== 'HEAD') return;
+  const originalEnd = res.end.bind(res);
+  res.end = (...args) => originalEnd();
+  res.write = () => true;
+}
+
 async function ensureDataDirs() {
   ensureDirs();
 }
@@ -227,6 +284,7 @@ module.exports = {
   securityHeaders,
   logRequest,
   ensureDataDirs,
+  suppressBodyForHead,
   HttpError,
   MIME,
   BODY_LIMIT

@@ -31,6 +31,26 @@ function str(value, fallback = '') {
   return value === undefined || value === null || String(value).trim() === '' ? fallback : String(value);
 }
 
+/**
+ * Таймзона, понятная Intl. Любая опечатка в SITE_TIMEZONE («Asia/Almaty »,
+ * «Alma-Aty», пустая строка) заставляла Intl.DateTimeFormat бросать
+ * RangeError — и падал каждый запрос, включая /healthz. Ошибочное значение
+ * заменяем безопасным и предупреждаем в консоль.
+ */
+function validTimezone(value, fallback = 'Asia/Almaty') {
+  const candidate = str(value);
+  if (!candidate) return fallback;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate });
+    return candidate;
+  } catch {
+    console.warn(
+      `[config] SITE_TIMEZONE="${candidate}" не распознана, используется ${fallback}. Проверьте значение.`
+    );
+    return fallback;
+  }
+}
+
 // ── Платформа ────────────────────────────────────────────────────────────────
 // На Vercel файловая система доступна только для чтения, а /tmp — эфемерный:
 // он живёт в пределах одного прогретого инстанса и теряется вместе с ним.
@@ -44,7 +64,7 @@ const kvUrl = str(env.KV_REST_API_URL) || str(env.UPSTASH_REDIS_REST_URL);
 const kvToken = str(env.KV_REST_API_TOKEN) || str(env.UPSTASH_REDIS_REST_TOKEN);
 const kvConfigured = Boolean(kvUrl && kvToken);
 
-const storeDriver = env.STORE_DRIVER || (kvConfigured ? 'kv' : 'file');
+const storeDriver = str(env.STORE_DRIVER) || (kvConfigured ? 'kv' : 'file');
 
 // Постоянное хранилище: KV всегда, файл — только вне Vercel.
 const persistentStorage = storeDriver === 'kv' ? true : !isVercel;
@@ -86,7 +106,10 @@ const config = {
     (!str(env.ADMIN_TOKEN) || str(env.ADMIN_TOKEN) === 'dev-admin-token-change-me'),
 
   // Идемпотентность заявок: сколько помним ключи повторных отправок.
-  idempotencyWindowMs: int(env.IDEMPOTENCY_WINDOW_MINUTES, 120) * 60 * 1000,
+  // Значение по умолчанию совпадает с тем, что обещает .env.example (15 минут):
+  // расхождение между документацией и кодом означало, что повторный клик
+  // по кнопке мог пройти уже через два часа.
+  idempotencyWindowMs: int(env.IDEMPOTENCY_WINDOW_MINUTES, 15) * 60 * 1000,
   storeDriver,
   kv: kvConfigured ? { url: kvUrl, token: kvToken } : null,
   persistentStorage,
@@ -97,7 +120,7 @@ const config = {
   // на внутренний порт. Привязка к 127.0.0.1 там не нужна и вредна.
   host: isVercel ? null : env.HOST || '127.0.0.1',
   siteUrl,
-  timezone: env.SITE_TIMEZONE || 'Asia/Almaty',
+  timezone: validTimezone(env.SITE_TIMEZONE, 'Asia/Almaty'),
 
   // Админка: основной способ входа — пароль (ADMIN_PASSWORD) с подписанной
   // сессионной кукой. ADMIN_TOKEN оставлен для совместимости и как API-ключ.

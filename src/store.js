@@ -228,7 +228,10 @@ async function load(force) {
   return cache;
 }
 
-/** Простейшие миграции схемы: добавляет отсутствующие коллекции. */
+/**
+ * Простейшие миграции схемы: добавляет отсутствующие коллекции
+ * и синхронизирует FAQ с src/data/content.js.
+ */
 function migrate(data) {
   const defaults = createDefaultData();
   let changed = false;
@@ -238,6 +241,33 @@ function migrate(data) {
       changed = true;
     }
   }
+
+  /*
+   * FAQ — единственный контент, который нигде не редактируется: в админке
+   * правятся пакеты, настройки, слоты и заявки, а пути /api/admin/faq нет.
+   * Значит источник правды — src/data/content.js, и база должна его
+   * отражать.
+   *
+   * Без этого пункт уходит «в вечность»: вопрос про название локации автор
+   * убрал из контента и зафиксировал в AUDIT.md, но уже развёрнутый стенд
+   * продолжал показывать его посетителю, и проверка стендов падала.
+   * Полная перезапись здесь корректна — редактировать FAQ некому.
+   */
+  if (Array.isArray(data.faq)) {
+    const inSource = new Set(defaults.faq.map((item) => item.id));
+    const filtered = data.faq.filter((item) => inSource.has(item.id));
+    if (filtered.length !== data.faq.length) {
+      data.faq = filtered;
+      changed = true;
+    }
+    const inDb = new Set(data.faq.map((item) => item.id));
+    const missing = defaults.faq.filter((item) => !inDb.has(item.id));
+    if (missing.length) {
+      data.faq = data.faq.concat(missing);
+      changed = true;
+    }
+  }
+
   if (!data.meta) {
     data.meta = { schemaVersion: 1, createdAt: new Date().toISOString() };
     changed = true;

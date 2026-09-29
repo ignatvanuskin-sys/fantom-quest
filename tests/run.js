@@ -986,6 +986,129 @@ async function run() {
     assert.strictEqual(snapshot.settings.timezone, 'Asia/Almaty');
   });
 
+  /* ── Регрессии, найденные аудитом ────────────────────────────────────── */
+
+  console.log('\n  — Исправленные дефекты —');
+
+  await test('Время окончания считается в местной таймзоне, а не в UTC', async () => {
+    // Регрессия: formatHHMM брала getUTCHours(), и слот 18:00 в Asia/Almaty
+    // возвращал endTime "14:00" — на пять часов раньше. Администратор и
+    // уведомление получали время, в котором игра не заканчивается.
+    const res = await postJson('/api/bookings', validBooking({
+      date: futureDate(9),
+      time: '18:00',
+      phone: '+7 700 555 10 20',
+      idempotencyKey: 'regression-endtime'
+    }));
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.json.booking.startTime, '18:00');
+    assert.strictEqual(res.json.booking.endTime, '19:00', 'час игры 18:00–19:00 в Asia/Almaty');
+    assert.strictEqual(res.json.booking.crossesMidnight, false);
+    assert.strictEqual(res.json.booking.startIso, new Date(res.json.booking.date + 'T13:00:00.000Z').toISOString());
+  });
+
+  await test('Ночная запись хранит endTime следующих суток', async () => {
+    const res = await postJson('/api/bookings', validBooking({
+      date: futureDate(9),
+      time: '01:00',
+      phone: '+7 700 555 10 21',
+      idempotencyKey: 'regression-night'
+    }));
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.json.booking.startTime, '01:00');
+    assert.strictEqual(res.json.booking.endTime, '02:00');
+    assert.strictEqual(res.json.booking.crossesMidnight, true, 'слот 01:00 относится к ночной части смены');
+  });
+
+  await test('Признак ночного слота следует за настройкой смены', async () => {
+    // Раньше здесь стояло жёсткое «меньше 09:00». Сдвинем начало смены на
+    // 12:00 и убедимся, что признак пересчитан по фактической дате слота.
+    const login = await postJson('/api/admin/login', { password: 'test-password-strong' });
+    assert.strictEqual(login.status, 200);
+    const cookie = login.headers.get('set-cookie').split(';')[0];
+
+    const patchHeaders = { headers: { cookie } };
+    const applied = await patchJson(
+      '/api/admin/settings',
+      { hours: { shiftStart: '12:00', shiftEnd: '05:00' } },
+      patchHeaders
+    );
+    assert.strictEqual(applied.status, 200, 'смена часов работы должна примениться');
+    const res = await get('/api/availability?date=' + futureDate(11));
+    assert.strictEqual(res.status, 200);
+    const slot = res.json.slots.find((item) => item.time === '02:00');
+    assert.ok(slot, 'слот 02:00 должен быть в сетке при смене 12:00–05:00');
+    assert.strictEqual(slot.crossesMidnight, true, '02:00 при начале смены в 12:00 — ночной слот');
+
+    await patchJson('/api/admin/settings', { hours: { shiftStart: '09:00', shiftEnd: '02:00' } }, patchHeaders);
+  });
+
+  await test('HEAD отдаёт те же заголовки, что GET, но без тела', async () => {
+    // Раньше HEAD / отвечал 404: роутер искал маршрут строго по методу.
+    for (const pathname of ['/', '/quests', '/api/site']) {
+      const head = await get(pathname, { method: 'HEAD' });
+      const normal = await get(pathname);
+      assert.strictEqual(head.status, 200, `HEAD ${pathname} должен отдавать 200, а не ${head.status}`);
+      assert.strictEqual(head.text.length, 0, `HEAD ${pathname} не должен возвращать тело`);
+      assert.strictEqual(
+        head.headers.get('content-type'),
+        normal.headers.get('content-type'),
+        `HEAD ${pathname}: тип содержимого отличается от GET`
+      );
+    }
+  });
+
+  await test('Битая escape-последовательность в адресе даёт 404, а не 500', async () => {
+    for (const pathname of ['/images/%E0%A4%A', '/%zz', '/images/']) {
+      const res = await get(pathname);
+      assert.ok(res.status < 500, `${pathname} вернул ${res.status} — серверная ошибка на мусорном адресе`);
+    }
+  });
+
+  await test('Ответы защищены Content-Security-Policy', async () => {
+    const home = await get('/');
+    const api = await get('/api/site');
+    for (const res of [home, api]) {
+      const csp = res.headers.get('content-security-policy');
+      assert.ok(csp, 'заголовок Content-Security-Policy отсутствует');
+      assert.ok(csp.includes("default-src 'self'"), 'нет базового правила default-src');
+      assert.ok(csp.includes("object-src 'none'"), 'не запрещены плагины');
+    }
+  });
+
+  await test('FAQ в базе совпадает с источником контента', async () => {
+    // Пункт, убранный из src/data/content.js, обязан уйти и из базы.
+    // Иначе уже развёрнутый стенд продолжает показывать посетителю вопрос,
+    // который автор закрыл как неподходящий для публичного списка.
+    const store = require('../src/store');
+    const { createDefaultData } = require('../src/seed-data');
+    const inSource = new Set(createDefaultData().faq.map((item) => item.id));
+    const ids = (await store.read()).faq.map((item) => item.id);
+    const orphans = ids.filter((id) => !inSource.has(id));
+    assert.deepStrictEqual(orphans, [], 'в базе остались FAQ, которых нет в содержании сайта');
+    assert.ok(!ids.includes('faq-name'), 'вопрос про название локации не должен публиковаться');
+
+    const page = await get('/faq');
+    assert.ok(!page.text.includes('Как называется локация'), 'вопрос про название попал на страницу');
+    assert.ok(!page.text.includes('Последний обряд'), 'второе название локации не должно обсуждаться');
+  });
+
+  await test('Интервал слота совпадает с заявленной длительностью', async () => {
+    const res = await postJson('/api/bookings', validBooking({
+      date: futureDate(10),
+      time: '20:00',
+      phone: '+7 700 555 10 22',
+      idempotencyKey: 'regression-duration'
+    }));
+    assert.strictEqual(res.status, 201);
+    const start = Date.parse(res.json.booking.startIso);
+    const end = Date.parse(res.json.booking.endIso);
+    const minutes = (end - start) / 60000;
+    assert.strictEqual(minutes, res.json.booking.durationMinutes, 'длительность слота не совпадает с интервалом');
+    assert.ok(minutes > 0 && minutes <= 240, `подозрительная длительность: ${minutes}`);
+    assert.strictEqual(res.json.booking.endTime, '21:00', '20:00 + 60 минут в Asia/Almaty = 21:00');
+  });
+
   /* ── Итог ─────────────────────────────────────────────────────────────── */
 
   const failed = results.filter((item) => !item.ok);

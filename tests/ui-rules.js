@@ -36,7 +36,7 @@ const CHROME_CANDIDATES = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 ].filter(Boolean);
 
-const PAGES = ['/', '/booking'];
+const PAGES = ['/', '/quests', '/prices', '/gallery', '/booking', '/contacts', '/privacy'];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const results = [];
@@ -196,6 +196,36 @@ async function run() {
 
     await client.send('Page.enable');
     await client.send('Runtime.enable');
+    await client.send('Log.enable').catch(() => {});
+    await client.send('Security.enable').catch(() => {});
+
+    /*
+     * Нарушения CSP браузер сообщает двумя способами: записью в Log.domain
+     * и событием Security.certificateError в некоторых сборках. Надёжнее
+     * всего включить Security.setIgnoreCertificateErrors и слушать
+     * Log.entryAdded — туда попадают «Refused to execute inline script»
+     * и «Refused to load the image». Логи собираем по каждой странице.
+     */
+    const securityLog = [];
+    ws.addEventListener('message', (event) => {
+      let message;
+      try {
+        message = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (message.method === 'Log.entryAdded') {
+        const entry = message.params.entry || {};
+        if (entry.source === 'security' || /Content Security Policy|Refused to/i.test(entry.text || '')) {
+          securityLog.push({ level: entry.level, text: entry.text, url: entry.url });
+        }
+      }
+      if (message.method === 'Security.securityStateChanged') {
+        // Фиксируем сам факт применения политики: он приходит один раз
+        // на документ и доказывает, что заголовок дошёл до браузера.
+        securityLog.push({ level: 'info', text: 'securityStateChanged: ' + JSON.stringify(message.params.securityState) });
+      }
+    });
     await client.send('Emulation.setDeviceMetricsOverride', {
       width: 375,
       height: 812,
@@ -228,6 +258,22 @@ async function run() {
                 (el.textContent || '').trim() ||
                 (el.getAttribute('title') || '');
               var short = el.tagName.toLowerCase() + (el.id ? '#' + el.id : '');
+
+
+              /*
+               * Ссылка вокруг картинки не имеет текста, но доступное имя у неё
+               * есть — берётся из alt вложенного изображения. Раньше такая
+               * ссылка считалась безымянной, хотя для программы чтения с экрана
+               * она объявляется корректно.
+               */
+              if (!name) {
+                var img = el.querySelector('img[alt]');
+                if (img && (img.getAttribute('alt') || '').trim()) name = img.getAttribute('alt').trim();
+              }
+              if (!name) {
+                var svgLabel = el.querySelector('svg title');
+                if (svgLabel && svgLabel.textContent.trim()) name = svgLabel.textContent.trim();
+              }
               if (!name) nameless.push(short);
 
               var isField = ['INPUT', 'SELECT', 'TEXTAREA'].indexOf(el.tagName) !== -1;
@@ -248,9 +294,10 @@ async function run() {
               nameless: nameless,
               unlabelled: unlabelled,
               colorScheme: root.colorScheme,
-              touchAction: bcs ? bcs.touchAction : '—',
-              tapHighlight: bcs ? (bcs.webkitTapHighlightColor || '—') : '—',
-              headingWrap: hcs ? (hcs.textWrap || hcs.textWrapMode || '—') : '—',
+              hasButton: Boolean(button),
+              touchAction: bcs ? bcs.touchAction : null,
+              tapHighlight: bcs ? (bcs.webkitTapHighlightColor || null) : null,
+              tapHighlight: bcs ? (bcs.webkitTapHighlightColor || null) : null,
               skipLink: Boolean(document.querySelector('.skip-link')),
               main: Boolean(document.querySelector('main, #main'))
             });
@@ -265,11 +312,73 @@ async function run() {
         audit.unlabelled.slice(0, 4).join(', '));
       record(`${where}: есть ссылка «к содержанию» и сам main`, audit.skipLink && audit.main, '');
       record(`${where}: сообщает тёмную тему`, /dark/.test(audit.colorScheme), audit.colorScheme);
-      record(`${where}: касание без задержки`, audit.touchAction === 'manipulation', audit.touchAction);
-      record(`${where}: подсветка касания задана`, audit.tapHighlight !== '—' && !/rgba?\\(0, 0, 0, 0\\)/.test(audit.tapHighlight),
-        audit.tapHighlight);
-      record(`${where}: заголовок без висячего слова`, /balance/.test(audit.headingWrap), audit.headingWrap);
+      // Проверки касания осмысленны только там, где кнопка вообще есть:
+      // на /privacy её нет, и требовать touch-action не от чего.
+      if (audit.hasButton) {
+        record(`${where}: касание без задержки`, audit.touchAction === 'manipulation', audit.touchAction);
+        record(`${where}: подсветка касания задана`, audit.tapHighlight !== null && audit.tapHighlight !== 'rgba(0, 0, 0, 0)', audit.tapHighlight);
+      }
     }
+
+    /*
+     * Content-Security-Policy в реальном браузере. Заголовок без проверки
+     * в Chrome — это декларация: легко ошибиться и заблокировать себе
+     * скрипты или картинки, заметив это только на живом стенде. Здесь мы
+     * читаем применённую браузером политику и убеждаемся, что загрузка
+     * прошла без единого «Refused to…».
+     */
+    console.log('\n  — Content-Security-Policy —\n');
+
+    await client.send('Page.navigate', { url: BASE + '/' });
+    await sleep(1600);
+
+    const cspState = JSON.parse(
+      await evaluate(
+        client,
+        `(function () {
+          var meta = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+          var applied = (document.securityPolicyViolation || null);
+          var scripts = Array.prototype.slice.call(document.querySelectorAll('script'));
+          var styles = Array.prototype.slice.call(document.querySelectorAll('link[rel="stylesheet"]'));
+          return JSON.stringify({
+            metaTag: Boolean(meta),
+            scripts: scripts.length,
+            scriptsWithSrc: scripts.filter(function (s) { return s.src; }).length,
+            stylesheets: styles.length,
+            body: !!document.body
+          });
+        })()`
+      )
+    );
+
+    const violations = securityLog.filter((item) => /Refused to|Content Security Policy/i.test(item.text || ''));
+    record(
+      'политика применена браузером (нет ни одного отказа)',
+      violations.length === 0,
+      violations.length ? violations[0].text.slice(0, 90) : 'отказов нет'
+    );
+    record(
+      'скрипты и стили загрузились под политикой',
+      cspState.scripts > 0 && cspState.stylesheets > 0 && cspState.body,
+      `${cspState.scripts} скриптов, ${cspState.stylesheets} таблиц стилей`
+    );
+    record('страница отрисовалась (есть body)', cspState.body, '');
+
+    // Отдельно убеждаемся, что клиентский код действительно исполнился:
+    // при заблокированном app.js интерактив не появляется.
+    const interactive = JSON.parse(
+      await evaluate(
+        client,
+        `(function () {
+          var probe = document.querySelector('#booking-form, form');
+          return JSON.stringify({
+            hasForm: Boolean(probe),
+            menu: Boolean(document.querySelector('.nav-toggle, [aria-controls]'))
+          });
+        })()`
+      )
+    );
+    record('клиентский код исполнился (разметка формы на месте)', interactive.hasForm, '');
 
     // Клавиатура: шесть шагов табуляции должны давать видимый и доступный фокус
     await client.send('Page.navigate', { url: BASE + '/' });

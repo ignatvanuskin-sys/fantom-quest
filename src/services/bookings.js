@@ -144,7 +144,8 @@ async function create(payload, context = {}) {
       date: input.date,
       businessDate: input.date,
       startTime: input.time,
-      endTime: formatHHMM(new Date(slotCheck.end.getTime())),
+      endTime: time.utcToZoned(tz, slotCheck.end).time,
+      crossesMidnight: slotCheck.crossesMidnight,
       startIso: slotCheck.start.toISOString(),
       endIso: slotCheck.end.toISOString(),
       timezone: tz,
@@ -199,10 +200,6 @@ async function create(payload, context = {}) {
   });
 
   return { booking: result, notification };
-}
-
-function formatHHMM(date) {
-  return String(date.getUTCHours()).padStart(2, '0') + ':' + String(date.getUTCMinutes()).padStart(2, '0');
 }
 
 /** Материализация/обновление сущности AvailabilitySlot. */
@@ -330,7 +327,13 @@ function publicView(booking) {
     endTime: booking.endTime,
     startIso: booking.startIso,
     endIso: booking.endIso,
-    crossesMidnight: booking.startTime < '09:00',
+    // Признак ночного слота сохранён при создании заявки. Запасной вариант
+    // нужен для записей, сделанных до появления поля: смена часов работы
+    // не должна ломать подтверждение уже принятых заявок.
+    crossesMidnight:
+      typeof booking.crossesMidnight === 'boolean'
+        ? booking.crossesMidnight
+        : time.minuteOfDay(booking.startTime) < time.minuteOfDay('09:00'),
     guests: booking.guests,
     name: booking.name,
     phone: booking.phone,

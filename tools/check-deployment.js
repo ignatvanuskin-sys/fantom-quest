@@ -202,9 +202,37 @@ async function get(pathname, options) {
 
   console.log('\n  — SEO —');
   const canonical = /<link rel="canonical" href="([^"]+)"/.exec(home.text);
-  check('canonical на свой домен', Boolean(canonical) && canonical[1].startsWith(BASE), canonical ? canonical[1] : 'нет');
+  // Локально BASE открывается как http://127.0.0.1, а SITE_URL по умолчанию
+  // — http://localhost. Это один и тот же сервер, поэтому сравниваем origin,
+  // предварительно сводя оба варианта loopback-адреса к одному.
+  const sameOrigin = (value) => {
+    const normalize = (host) => (host === '127.0.0.1' || host === 'localhost' ? 'loopback' : host);
+    try {
+      const a = new URL(value);
+      const b = new URL(BASE);
+      return a.protocol === b.protocol && normalize(a.hostname) === normalize(b.hostname) && a.port === b.port;
+    } catch {
+      return false;
+    }
+  };
+  check('canonical на свой домен', Boolean(canonical) && sameOrigin(canonical[1]), canonical ? canonical[1] : 'нет');
   const og = /property="og:image" content="([^"]+)"/.exec(home.text);
-  check('og:image абсолютный', Boolean(og) && og[1].startsWith('https://'), og ? og[1] : 'нет');
+  // og:image обязан быть абсолютным адресом и указывать на тот же сайт,
+  // что и canonical: относительный путь ломает превью в мессенджерах.
+  check(
+    'og:image абсолютный и на том же домене',
+    Boolean(og) && /^https?:\/\//.test(og[1]) && Boolean(canonical) && (() => {
+      try {
+        const image = new URL(og[1]);
+        const site = new URL(canonical[1]);
+        const normalize = (host) => (host === '127.0.0.1' || host === 'localhost' ? 'loopback' : host);
+        return normalize(image.hostname) === normalize(site.hostname);
+      } catch {
+        return false;
+      }
+    })(),
+    og ? og[1] : 'нет'
+  );
   const ld = (home.text.match(/application\/ld\+json/g) || []).length;
   check('JSON-LD присутствует', ld >= 5, `${ld} блоков`);
   check('нет aggregateRating (рейтинг не наш)', !home.text.includes('aggregateRating'), '');

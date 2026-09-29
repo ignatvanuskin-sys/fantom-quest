@@ -16,9 +16,10 @@ data/audit.log.jsonl
 tests/artifacts/
 media-output/
 .research/
+research/
 *.log
+*.tmp
+.tmp-*
+qa-*.txt
 .DS_Store
 Thumbs.db
-
-# Отладочный вывод проверок: во время работы харнессы пишут в файл
-qa-*.txt
